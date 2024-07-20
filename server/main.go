@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net"
@@ -19,13 +20,32 @@ func NewServer(address string) *Server {
 }
 
 func (s *Server) Start() error {
-	listener, err := net.Listen("tcp", s.address)
+	// Load the server certificate and private key
+	cert, err := tls.LoadX509KeyPair("resources/server-cert.pem", "resources/server-key.pem")
 	if err != nil {
-		return fmt.Errorf("error starting server: %v", err)
+		return fmt.Errorf("error loading server certificate: %v", err)
 	}
-	defer listener.Close()
 
-	log.Printf("Server listening on %s\n", s.address)
+	// Create the TLS configuration
+	config := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12, // Ensure minimum TLS version 1.2
+	}
+
+	// Create a TLS listener
+	listener, err := tls.Listen("tcp", s.address, config)
+	if err != nil {
+		return fmt.Errorf("error starting TLS server: %v", err)
+	}
+
+	defer func(listener net.Listener) {
+		err := listener.Close()
+		if err != nil {
+			log.Printf("Error closing listener: %v\n", err)
+		}
+	}(listener)
+
+	log.Printf("TLS Server listening on %s\n", s.address)
 
 	for {
 		conn, err := listener.Accept()
