@@ -38,13 +38,12 @@ func (v *ChatView) Run() {
 
 	v.input = widget.NewEntry()
 	v.input.SetPlaceHolder("Type a message...")
+	v.input.OnSubmitted = func(string) {
+		v.submitContent(v.input.Text)
+	}
 
 	send := widget.NewButton("Send", func() {
-		if v.input.Text != "" {
-			v.viewModel.SendMessage(v.input.Text)
-			v.input.SetText("")
-			v.refreshMessageView()
-		}
+		v.submitContent(v.input.Text)
 	})
 
 	content := container.NewBorder(nil, container.NewBorder(nil, nil, nil, send, v.input), nil, nil, v.messages)
@@ -54,6 +53,14 @@ func (v *ChatView) Run() {
 
 	v.window.Resize(fyne.NewSize(400, 300))
 	v.window.ShowAndRun()
+}
+
+func (v *ChatView) submitContent(content string) {
+	if content != "" {
+		v.viewModel.SendMessage(content)
+		v.input.SetText("")
+		v.refreshMessageView()
+	}
 }
 
 func (v *ChatView) receiveMessages() {

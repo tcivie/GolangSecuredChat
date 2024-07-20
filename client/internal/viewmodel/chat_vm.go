@@ -31,7 +31,6 @@ func (vm *ChatViewModel) ReceiveMessages(messageChan chan<- model.Message) {
 	for {
 		content, err := vm.service.ReceiveMessage()
 		if err != nil {
-			// Handle error
 			messageChan <- model.Message{Content: "Error receiving message: " + err.Error(), Sender: "System"}
 			continue
 		}
