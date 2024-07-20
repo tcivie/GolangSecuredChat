@@ -2,18 +2,38 @@ package main
 
 import (
 	"bufio"
+	"crypto"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"log"
-	"net"
 	"os"
 )
 
 type Client struct {
-	conn net.Conn
+	conn        *tls.Conn
+	username    string
+	privateKey  crypto.PrivateKey
+	publicKey   crypto.PublicKey
+	isConnected bool
 }
 
 func NewClient(address string) (*Client, error) {
-	conn, err := net.Dial("tcp", address)
+	cert, err := os.ReadFile("resources/server-cert.pem")
+	if err != nil {
+		return nil, fmt.Errorf("error reading server certificate: %v", err)
+	}
+
+	certPool := x509.NewCertPool()
+	if ok := certPool.AppendCertsFromPEM(cert); !ok {
+		return nil, fmt.Errorf("failed to append certificate")
+	}
+
+	config := &tls.Config{
+		RootCAs: certPool,
+	}
+
+	conn, err := tls.Dial("tcp", address, config)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to server: %v", err)
 	}
@@ -22,8 +42,16 @@ func NewClient(address string) (*Client, error) {
 }
 
 func (c *Client) Start() {
+	defer func(conn *tls.Conn) {
+		err := conn.Close()
+		if err != nil {
+			log.Printf("Error closing connection: %v\n", err)
+		}
+	}(c.conn)
+
 	go c.receiveMessages()
 	c.sendMessages()
+
 }
 
 func (c *Client) receiveMessages() {
@@ -50,7 +78,7 @@ func (c *Client) sendMessages() {
 }
 
 func main() {
-	client, err := NewClient("localhost:8080")
+	client, err := NewClient("localhost:8080") // TODO: store in a file or get from user input
 	if err != nil {
 		log.Fatal(err)
 	}
