@@ -11,12 +11,12 @@ message Message {
 
     messageSource source = 1;
     optional string fromUsername = 2;
-    oneof message {
-        LoginMessage loginMessage = 3;
+    oneof packet {
+        LoginPacket loginMessage = 3;
     }
 }
 
-message LoginMessage {
+message LoginPacket {
     enum Status {
         REQUEST_TO_LOGIN = 0; // The user requests to login with username
 
