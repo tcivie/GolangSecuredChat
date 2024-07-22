@@ -13,6 +13,8 @@ message Message {
     optional string fromUsername = 2;
     oneof packet {
         LoginPacket loginMessage = 3;
+        ExchangeKeyPacket exchangeKeyMessage = 4;
+        ChatPacket chatMessage = 5;
     }
 }
 
@@ -34,4 +36,28 @@ message LoginPacket {
 enum LoginStatus {
     LOGGED_IN = 0;
     LOGGED_OUT = 1;
+}
+
+message ExchangeKeyPacket {
+    enum Status {
+        REQUEST_TO_EXCHANGE_KEY = 0; // The user requests to exchange key with another user
+
+        PUB_KEY_FROM_SERVER = 1; // The server sends the requested user's public key to the user
+        MESSAGE_WITH_SYM_KEY = 2; // The user sends the encrypted message with the symmetric key
+        EXCHANGE_KEY_REPLY = 3; // The client replies with the exchange key status
+    }
+    enum ExchangeKeyStatus {
+        EXCHANGE_KEY_SUCCESS = 0;
+        EXCHANGE_KEY_FAILED = 1;
+    }
+    Status status = 1;
+    optional string toUsername = 2; // To whom the packet is addressed
+    optional bytes publicKey = 3; // The public key of the user
+    optional bytes encryptedMessage = 4; // The encrypted message with the symmetric key
+    optional ExchangeKeyStatus exchangeKeyStatus = 5; // The status of the exchange key (Success or Failed)
+}
+
+message ChatPacket {
+    string toUsername = 1;
+    string message = 2;
 }

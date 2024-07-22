@@ -2,10 +2,11 @@ package service
 
 import (
 	"client/internal/model"
+	pb "client/resources/proto"
 )
 
 type ChatService struct {
-	client *model.Client
+	Client *model.Client
 }
 
 func NewChatService(address string) (*ChatService, error) {
@@ -13,13 +14,13 @@ func NewChatService(address string) (*ChatService, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ChatService{client: client}, nil
+	return &ChatService{Client: client}, nil
 }
 
-func (s *ChatService) SendMessage(message string) error {
-	return s.client.SendMessage(message)
+func (s *ChatService) SendMessage(message *pb.Message) error {
+	return s.Client.SendMessage(message)
 }
 
-func (s *ChatService) ReceiveMessage() (string, error) {
-	return s.client.ReceiveMessage()
+func (s *ChatService) ReceiveMessage() (*pb.Message, error) {
+	return s.Client.ReceiveMessage()
 }

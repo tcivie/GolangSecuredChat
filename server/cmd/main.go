@@ -29,7 +29,7 @@ func NewServer(address string) *Server {
 
 func (s *Server) Start() error {
 	// Load the server certificate and private key
-	cert, err := tls.LoadX509KeyPair("resources/server-cert.pem", "resources/server-key.pem")
+	cert, err := tls.LoadX509KeyPair("resources/auth/server-cert.pem", "resources/auth/server-key.pem")
 	if err != nil {
 		return fmt.Errorf("error loading server certificate: %v", err)
 	}
