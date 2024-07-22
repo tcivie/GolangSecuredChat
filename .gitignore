@@ -20,3 +20,5 @@
 # Go workspace file
 go.work
 go.work.sum
+/client/resources/proto/
+/server/resources/proto/

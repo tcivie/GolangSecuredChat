@@ -1,0 +1,37 @@
+syntax = "proto3";
+package securedChat;
+
+option go_package = "github.com/tcivie/GolangSecuredChat/pb";
+
+message Message {
+    enum messageSource {
+        CLIENT = 0;
+        SERVER = 1;
+    }
+
+    messageSource source = 1;
+    optional string fromUsername = 2;
+    oneof message {
+        LoginMessage loginMessage = 3;
+    }
+}
+
+message LoginMessage {
+    enum Status {
+        REQUEST_TO_LOGIN = 0; // The user requests to login with username
+
+        ENCRYPTED_TOKEN = 1; // The server sends the encrypted token to the user (With the user's public key)
+        DECRYPTED_TOKEN = 2; // The user sends the decrypted token
+
+        LOGIN_REPLY = 3; // Server replies with the login status
+    }
+
+    Status status = 1;
+    optional string token = 2;
+    optional LoginStatus loginStatus = 3;
+}
+
+enum LoginStatus {
+    LOGGED_IN = 0;
+    LOGGED_OUT = 1;
+}

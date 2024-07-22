@@ -3,8 +3,10 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
+	"google.golang.org/protobuf/proto"
 	"log"
 	"net"
+	pb "server/resources/proto"
 )
 
 type Server struct {
@@ -46,7 +48,12 @@ func (s *Server) Start() error {
 	}(listener)
 
 	log.Printf("TLS Server listening on %s\n", s.address)
+	s.handleConnections(listener)
 
+	return nil
+}
+
+func (s *Server) handleConnections(listener net.Listener) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -64,15 +71,19 @@ func (s *Server) handleClient(conn net.Conn) {
 	defer delete(s.clients, conn)
 
 	for {
-		buffer := make([]byte, 1024)
+		buffer := make([]byte, 1024*4)
 		n, err := conn.Read(buffer)
 		if err != nil {
 			log.Printf("Error reading from client: %v\n", err)
 			return
 		}
 
-		message := buffer[:n]
-		s.broadcast(message, conn)
+		message := &pb.Message{}
+		if err := proto.Unmarshal(buffer[:n], message); err != nil {
+			log.Fatalln("Failed to parse Message:", err)
+		}
+
+		//s.broadcast(message, conn)
 	}
 }
 

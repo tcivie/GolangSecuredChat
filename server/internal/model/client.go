@@ -1,28 +1,23 @@
 package model
 
 import (
-	"crypto"
+	"crypto/rsa"
 	"crypto/tls"
 )
-type Client struct{
-	Username string
-	PublicKey *crypto.PublicKey
-	conn *tls.Conn
+
+type Client struct {
+	Username  string
+	publicKey *rsa.PublicKey
+	conn      *tls.Conn
 }
 
-func NewClient(Username string, PublicKey *crypto.PublicKey) (*Client) {
+func NewClient(username string, publicKey *rsa.PublicKey) *Client {
 	return &Client{
-        Username: Username,
-        PublicKey: PublicKey,
-    }
-}
-// EncryptWithPublicKey encrypts a string using the provided public key and returns a Base64 encoded string
-func EncryptWithPublicKey(str string, publicKey *crypto.PublicKey) (string, error) {
-    // Parse the public key
+		Username:  username,
+		publicKey: publicKey,
+	}
 }
 
-func (c *Client) EncodeUsingPK(str string) (string, error){
-	return EncryptWithPublicKey(str,c.PublicKey)
+func (c *Client) EncodeUsingPubK(msg string) ([]byte, error) {
+	return rsa.EncryptPKCS1v15(nil, c.publicKey, []byte(msg))
 }
-
-
