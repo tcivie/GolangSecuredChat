@@ -4,17 +4,30 @@ import (
 	"client/internal/service"
 	"client/internal/view"
 	"client/internal/viewmodel"
-	"log"
+	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/widget"
 )
 
 func main() {
+	a := app.New()
 	chatService, err := service.NewChatService("localhost:8080")
-	if err != nil {
-		log.Fatal(err)
+	if err == nil {
+		loginVM := viewmodel.NewLoginViewModel(chatService.Client)
+		loginView := view.NewLoginView(loginVM, a)
+
+		chatVM := viewmodel.NewChatViewModel(chatService)
+		chatView := view.NewChatView(chatVM, a)
+
+		loginVM.SetOnLogin(func() {
+			chatView.View()
+		})
+		chatView.Run()
+		loginView.Run()
+	} else {
+		errWindow := a.NewWindow("Error connecting to server")
+		errorMessage := widget.NewLabel(err.Error())
+		errWindow.SetContent(errorMessage)
+		errWindow.ShowAndRun()
 	}
-
-	chatVM := viewmodel.NewChatViewModel(chatService)
-	chatView := view.NewChatView(chatVM)
-
-	chatView.Run()
+	a.Run()
 }
