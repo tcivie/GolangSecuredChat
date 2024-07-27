@@ -3,15 +3,21 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
-	"google.golang.org/protobuf/proto"
 	"log"
 	"net"
+	"server/internal/model"
 	pb "server/resources/proto"
+
+	"google.golang.org/protobuf/proto"
 )
 
 type Server struct {
 	address string
 	clients map[net.Conn]bool
+}
+
+func (s *Server) GetClient(username string) *model.Client{
+	return nil
 }
 
 func NewServer(address string) *Server {

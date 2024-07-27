@@ -9,6 +9,7 @@ type Client struct {
 	Username  string
 	publicKey *rsa.PublicKey
 	conn      *tls.Conn
+	GeneratedHash string
 }
 
 func NewClient(username string, publicKey *rsa.PublicKey) *Client {

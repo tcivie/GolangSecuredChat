@@ -22,3 +22,5 @@ go.work
 go.work.sum
 /client/resources/proto/
 /server/resources/proto/
+client/go.sum
+server/go.sum
