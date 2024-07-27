@@ -10,7 +10,7 @@ import (
 
 func main() {
 	a := app.New()
-	chatService, err := service.NewChatService("localhost:8080")
+	chatService, err := service.NewChatService("localhost:8080", "client/resources/private.pem")
 	if err == nil {
 		loginVM := viewmodel.NewLoginViewModel(chatService.Client)
 		loginView := view.NewLoginView(loginVM, a)

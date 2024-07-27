@@ -3,9 +3,10 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/joho/godotenv"
 	"log"
 	"net"
-	"server/internal/model"
+	"server/internal/actions"
 	pb "server/resources/proto"
 
 	"google.golang.org/protobuf/proto"
@@ -13,17 +14,13 @@ import (
 
 type Server struct {
 	address string
-	clients map[net.Conn]bool
-}
-
-func (s *Server) GetClient(username string) *model.Client{
-	return nil
+	clients map[*net.TCPConn]bool
 }
 
 func NewServer(address string) *Server {
 	return &Server{
 		address: address,
-		clients: make(map[net.Conn]bool),
+		clients: make(map[*net.TCPConn]bool),
 	}
 }
 
@@ -54,14 +51,18 @@ func (s *Server) Start() error {
 	}(listener)
 
 	log.Printf("TLS Server listening on %s\n", s.address)
-	s.handleConnections(listener)
+	tcpListener, ok := listener.(*net.TCPListener)
+	if !ok {
+		return fmt.Errorf("error converting listener to TCP listener")
+	}
+	s.handleConnections(tcpListener)
 
 	return nil
 }
 
-func (s *Server) handleConnections(listener net.Listener) {
+func (s *Server) handleConnections(listener *net.TCPListener) {
 	for {
-		conn, err := listener.Accept()
+		conn, err := listener.AcceptTCP()
 		if err != nil {
 			log.Printf("Error accepting connection: %v\n", err)
 			continue
@@ -72,7 +73,8 @@ func (s *Server) handleConnections(listener net.Listener) {
 	}
 }
 
-func (s *Server) handleClient(conn net.Conn) {
+func (s *Server) handleClient(conn *net.TCPConn) {
+	var messageHandler actions.MessageHandler
 	defer conn.Close()
 	defer delete(s.clients, conn)
 
@@ -89,7 +91,20 @@ func (s *Server) handleClient(conn net.Conn) {
 			log.Fatalln("Failed to parse Message:", err)
 		}
 
-		//s.broadcast(message, conn)
+		switch message.GetPacket().(type) {
+		case *pb.Message_LoginMessage:
+			messageHandler = actions.NewLoginMessageHandler(conn)
+			break
+		case *pb.Message_RegisterMessage:
+			messageHandler = actions.NewRegisterMessageHandler(conn)
+			break
+		default:
+			log.Printf("Unknown message type: %v\n", message)
+		}
+		messageContext := actions.NewMessageContext(messageHandler)
+		if err := messageContext.ExecuteStrategy(message); err != nil {
+			log.Printf("Error executing strategy: %v\n", err)
+		}
 	}
 }
 
@@ -109,6 +124,10 @@ func (s *Server) broadcast(message []byte, sender net.Conn) {
 }
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
 	server := NewServer(":8080")
 	log.Fatal(server.Start())
 }

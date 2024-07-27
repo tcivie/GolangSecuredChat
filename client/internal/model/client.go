@@ -2,6 +2,8 @@ package model
 
 import (
 	pb "client/resources/proto"
+	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -14,9 +16,11 @@ type Client struct {
 	Username    string
 	isLoggedIn  bool
 	isConnected bool
+	//
+	privateKey *rsa.PrivateKey
 }
 
-func NewClient(address string) (*Client, error) {
+func NewClient(address string, privateKeyPath string) (*Client, error) {
 	cert, err := os.ReadFile("resources/auth/server-cert.pem")
 	if err != nil {
 		return nil, fmt.Errorf("error reading server certificate: %v", err)
@@ -37,10 +41,20 @@ func NewClient(address string) (*Client, error) {
 		err = fmt.Errorf("error connecting to server: %v", err)
 		isConnected = false
 	}
+	//
+	privateKeyBytes, err := os.ReadFile(privateKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("error reading private key: %v", err)
+	}
+	privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing private key: %v", err)
+	}
 
 	return &Client{
 		Conn:        conn,
 		isConnected: isConnected,
+		privateKey:  privateKey,
 	}, err
 }
 
@@ -68,4 +82,12 @@ func (c *Client) ReceiveMessage() (*pb.Message, error) {
 
 func (c *Client) Close() error {
 	return c.Conn.Close()
+}
+
+func (c *Client) DecryptMessage(message []byte) ([]byte, error) {
+	decrypted, err := rsa.DecryptOAEP(sha256.New(), nil, c.privateKey, message, nil)
+	if err != nil {
+		return nil, fmt.Errorf("decryption error: %v", err)
+	}
+	return decrypted, nil
 }

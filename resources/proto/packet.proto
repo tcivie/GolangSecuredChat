@@ -15,27 +15,36 @@ message Message {
         LoginPacket loginMessage = 3;
         ExchangeKeyPacket exchangeKeyMessage = 4;
         ChatPacket chatMessage = 5;
+        RegisterPacket registerMessage = 6;
     }
 }
 
 message LoginPacket {
     enum Status {
         REQUEST_TO_LOGIN = 0; // The user requests to login with username
-
+        //
         ENCRYPTED_TOKEN = 1; // The server sends the encrypted token to the user (With the user's public key)
         DECRYPTED_TOKEN = 2; // The user sends the decrypted token
-
-        LOGIN_REPLY = 3; // Server replies with the login status
+        //
+        LOGIN_SUCCESS = 3; // The server sends the login status
+        LOGIN_FAILED = 4; // The server sends the login status
     }
 
     Status status = 1;
-    optional string token = 2;
-    optional LoginStatus loginStatus = 3;
+    optional bytes token = 2;
 }
 
-enum LoginStatus {
-    LOGGED_IN = 0;
-    LOGGED_OUT = 1;
+message RegisterPacket {
+    enum Status {
+        REQUEST_TO_REGISTER = 0; // The user requests to register with username
+        REGISTER_REPLY = 1; // Server replies with the register status
+        //
+        REGISTER_SUCCESS = 2;
+        REGISTER_FAILED = 3;
+    }
+
+    Status status = 1;
+    optional bytes publicKey = 2;
 }
 
 message ExchangeKeyPacket {

@@ -9,8 +9,8 @@ type ChatService struct {
 	Client *model.Client
 }
 
-func NewChatService(address string) (*ChatService, error) {
-	client, err := model.NewClient(address)
+func NewChatService(address string, privateKeyPath string) (*ChatService, error) {
+	client, err := model.NewClient(address, privateKeyPath)
 	if err != nil {
 		return nil, err
 	}
