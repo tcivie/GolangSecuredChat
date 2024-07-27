@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Start Client" type="GoApplicationRunConfiguration" factoryName="Go Application" singleton="false">
+    <module name="GolangSecuredChat" />
+    <working_directory value="$PROJECT_DIR$" />
+    <kind value="FILE" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/client/cmd/main.go" />
+    <method v="2" />
+  </configuration>
+</component>

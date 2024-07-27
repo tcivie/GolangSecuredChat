@@ -2,37 +2,69 @@ package viewmodel
 
 import (
 	"client/internal/model"
-	"log"
+	"client/internal/service"
+	pb "client/resources/proto"
+	"fmt"
 )
 
 type ChatViewModel struct {
-	client   *model.Client
-	messages []model.Message
+	chatService *service.ChatService
+	messages    []model.Message
 }
 
-func NewChatViewModel(client *model.Client) *ChatViewModel {
+func NewChatViewModel(service *service.ChatService) *ChatViewModel {
 	return &ChatViewModel{
-		client:   client,
-		messages: []model.Message{},
+		chatService: service,
+		messages:    []model.Message{},
 	}
 }
 
 func (vm *ChatViewModel) SendMessage(content string) {
-	err := vm.client.SendMessage(content)
+	chatMessage := &pb.Message{
+		Source:       pb.Message_CLIENT,
+		FromUsername: &vm.chatService.Client.Username,
+		Packet: &pb.Message_ChatMessage{
+			ChatMessage: &pb.ChatPacket{
+				ToUsername: "test", // TODO: Implement this
+				Message:    content,
+			},
+		},
+	}
+	err := vm.chatService.SendMessage(chatMessage)
 	if err != nil {
-		log.Printf("Error sending message: %v\n", err)
+		vm.AddMessage(model.Message{Content: "Error sending message: " + err.Error(), Sender: "System"})
+	} else {
+		vm.AddMessage(model.Message{Content: content, Sender: "You"})
 	}
 }
 
 func (vm *ChatViewModel) ReceiveMessages(messageChan chan<- model.Message) {
 	for {
-		content, err := vm.client.ReceiveMessage()
+		chatMessage, err := vm.chatService.ReceiveMessage()
 		if err != nil {
-			log.Printf("Error receiving message: %v\n", err)
-			return
+			messageChan <- model.Message{Content: "Error receiving message: " + err.Error(), Sender: "System"}
+			continue
 		}
-		message := model.Message{Content: content, Sender: "Server"}
+		chatMessageContent := chatMessage.GetChatMessage().GetMessage()
+		senderUsername := chatMessage.GetFromUsername()
+		message := model.Message{Content: chatMessageContent, Sender: senderUsername}
 		vm.messages = append(vm.messages, message)
 		messageChan <- message
 	}
+}
+
+func (vm *ChatViewModel) AddMessage(message model.Message) {
+	vm.messages = append(vm.messages, message)
+}
+
+func (vm *ChatViewModel) GetMessageCount() int {
+	return len(vm.messages)
+}
+
+func (vm *ChatViewModel) GetMessageContent(index int) string {
+	if index < 0 || index >= len(vm.messages) {
+		return ""
+	}
+	msg := vm.messages[index]
+	return fmt.Sprintf("%s", msg.Content)
 }
