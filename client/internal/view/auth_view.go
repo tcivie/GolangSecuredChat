@@ -10,19 +10,24 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-type LoginView struct {
-	viewModel *viewmodel.LoginViewModel
-	app       fyne.App
-	window    fyne.Window
-	username  *widget.Entry
-	status    *widget.Label
+type AuthView struct {
+	viewModel  *viewmodel.AuthViewModel
+	app        fyne.App
+	window     fyne.Window
+	username   *widget.Entry
+	status     *widget.Label
+	statusChan chan string
 }
 
-func NewLoginView(vm *viewmodel.LoginViewModel, app fyne.App) *LoginView {
-	return &LoginView{viewModel: vm, app: app}
+func NewLoginView(vm *viewmodel.AuthViewModel, app fyne.App) *AuthView {
+	return &AuthView{
+		viewModel:  vm,
+		app:        app,
+		statusChan: make(chan string),
+	}
 }
 
-func (v *LoginView) Run() {
+func (v *AuthView) Run() {
 	v.window = v.app.NewWindow("CryptoChat - Secure Messaging")
 
 	// Create logo
@@ -54,9 +59,13 @@ func (v *LoginView) Run() {
 	v.username.SetPlaceHolder("Enter username")
 
 	loginButton := widget.NewButton("Secure Login", func() {
-		v.attemptLogin()
+		go v.attemptLogin()
 	})
 	loginButton.Importance = widget.HighImportance
+
+	registerButton := widget.NewButton("Register", func() {
+		go v.attemptRegister()
+	})
 
 	v.status = widget.NewLabel("")
 
@@ -69,6 +78,7 @@ func (v *LoginView) Run() {
 		layout.NewSpacer(),
 		v.username,
 		loginButton,
+		registerButton,
 		v.status,
 	)
 
@@ -77,20 +87,43 @@ func (v *LoginView) Run() {
 
 	v.window.SetContent(paddedContent)
 	v.window.Resize(fyne.NewSize(400, 600))
+
+	go v.listenForStatusUpdates()
 	v.window.ShowAndRun()
 }
 
-func (v *LoginView) attemptLogin() {
+func (v *AuthView) attemptLogin() {
 	username := v.username.Text
 	v.viewModel.Username = username
 	onLogin, err := v.viewModel.Login()
+	v.updateStatus(err, "Login", onLogin)
+}
+
+func (v *AuthView) attemptRegister() {
+	username := v.username.Text
+	v.viewModel.Username = username
+	onLogin, err := v.viewModel.Register()
+	v.updateStatus(err, "Registration", onLogin)
+}
+
+func (v *AuthView) updateStatus(err error, action string, onLogin *func()) {
 	if err != nil {
-		v.status.SetText("Login failed: " + err.Error())
+		v.statusChan <- action + " failed: " + err.Error()
 	} else {
-		v.status.SetText("Login successful!")
+		v.statusChan <- action + " successful!"
 		v.window.Close()
 		if onLogin != nil {
 			(*onLogin)()
 		}
 	}
+}
+
+func (v *AuthView) listenForStatusUpdates() {
+	for status := range v.statusChan {
+		v.status.SetText(status)
+	}
+}
+
+func (v *AuthView) View() {
+	v.window.Show()
 }

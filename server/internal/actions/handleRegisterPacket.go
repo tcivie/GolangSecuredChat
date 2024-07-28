@@ -2,24 +2,24 @@ package actions
 
 import (
 	"fmt"
-	"google.golang.org/protobuf/proto"
 	"net"
 	"server/internal/db"
+	"server/internal/util"
 	pb "server/resources/proto"
 )
 
 type RegisterMessageHandler struct {
-	conn *net.TCPConn
+	conn net.Conn
 }
 
-func NewRegisterMessageHandler(conn *net.TCPConn) *RegisterMessageHandler {
+func NewRegisterMessageHandler(conn net.Conn) *RegisterMessageHandler {
 	return &RegisterMessageHandler{conn: conn}
 }
 
 func (h *RegisterMessageHandler) handleMessage(message *pb.Message) error {
 	var err error
 	registerMessage := message.GetRegisterMessage()
-	if registerMessage == nil {
+	if registerMessage == nil || message.GetFromUsername() == "" {
 		return fmt.Errorf("unable to parse register message")
 	}
 
@@ -27,7 +27,8 @@ func (h *RegisterMessageHandler) handleMessage(message *pb.Message) error {
 	case pb.RegisterPacket_REQUEST_TO_REGISTER:
 		fmt.Println("Received request to register")
 		database := db.GetDatabase()
-		if err := database.CreateNewUser(message.GetFromUsername(), registerMessage.GetPublicKey()); err != nil {
+		hashedUsername := util.HashString(message.GetFromUsername())
+		if err := database.CreateNewUser(hashedUsername, registerMessage.GetPublicKey()); err != nil {
 			registerMessage = &pb.RegisterPacket{
 				Status: pb.RegisterPacket_REGISTER_FAILED,
 			}
@@ -52,15 +53,5 @@ func (h *RegisterMessageHandler) sendRegisterMessage(reply *pb.RegisterPacket) e
 		},
 	}
 
-	data, err := proto.Marshal(message)
-	if err != nil {
-		return fmt.Errorf("error marshalling message: %v", err)
-	}
-
-	_, err = h.conn.Write(data)
-	if err != nil {
-		return fmt.Errorf("error sending message: %v", err)
-	}
-
-	return nil
+	return util.SendMessage(h.conn, message)
 }

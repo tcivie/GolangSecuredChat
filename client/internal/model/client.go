@@ -6,8 +6,12 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/binary"
 	"fmt"
+	"golang.org/x/crypto/ssh"
 	"google.golang.org/protobuf/proto"
+	"io"
+	"log"
 	"os"
 )
 
@@ -46,15 +50,14 @@ func NewClient(address string, privateKeyPath string) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error reading private key: %v", err)
 	}
-	privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBytes)
+	key, err := ssh.ParseRawPrivateKey(privateKeyBytes)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing private key: %v", err)
 	}
-
 	return &Client{
 		Conn:        conn,
 		isConnected: isConnected,
-		privateKey:  privateKey,
+		privateKey:  key.(*rsa.PrivateKey),
 	}, err
 }
 
@@ -63,21 +66,47 @@ func (c *Client) SendMessage(message *pb.Message) error {
 	if err != nil {
 		return err
 	}
+
+	// Write the length of the message
+	log.Println("SendMessage data length: ", len(data))
+	err = binary.Write(c.Conn, binary.BigEndian, uint32(len(data)))
+	if err != nil {
+		return err
+	}
+
+	// Write the message itself
+	log.Println("SendMessage data: ", data)
 	_, err = c.Conn.Write(data)
 	return err
 }
 
-func (c *Client) ReceiveMessage() (*pb.Message, error) {
-	data := make([]byte, 1024*4)
-	n, err := c.Conn.Read(data)
+func (c *Client) GetMessage() (*pb.Message, error) {
+	// Read the message length
+	var length uint32
+	err := binary.Read(c.Conn, binary.BigEndian, &length)
+	log.Println("GetMessage length: ", length)
 	if err != nil {
+		log.Println("Error reading message length: ", err)
 		return nil, err
 	}
-	message := pb.Message{}
-	if err := proto.Unmarshal(data[:n], &message); err != nil {
+
+	// Read the message data
+	data := make([]byte, length)
+	_, err = io.ReadFull(c.Conn, data)
+	log.Println("GetMessage data: ", data)
+	if err != nil {
+		log.Println("Error reading message data: ", err)
 		return nil, err
 	}
-	return &message, nil
+
+	// Unmarshal the message
+	message := &pb.Message{}
+	if err := proto.Unmarshal(data, message); err != nil {
+		log.Println("Error unmarshalling message: ", err)
+		return nil, err
+	}
+
+	return message, nil
 }
 
 func (c *Client) Close() error {
@@ -90,4 +119,14 @@ func (c *Client) DecryptMessage(message []byte) ([]byte, error) {
 		return nil, fmt.Errorf("decryption error: %v", err)
 	}
 	return decrypted, nil
+}
+
+func (c *Client) GetPubKey() *rsa.PublicKey {
+	pubKey := c.privateKey.Public()
+	pubKeyRSA, ok := pubKey.(*rsa.PublicKey)
+	if !ok {
+		fmt.Println("Error casting public key")
+		return nil
+	}
+	return pubKeyRSA
 }

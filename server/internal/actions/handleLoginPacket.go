@@ -3,8 +3,8 @@ package actions
 import (
 	"bytes"
 	"crypto/rsa"
+	"crypto/sha256"
 	"fmt"
-	"google.golang.org/protobuf/proto"
 	"net"
 	"server/internal/db"
 	"server/internal/util"
@@ -12,13 +12,13 @@ import (
 )
 
 type LoginMessageHandler struct {
-	conn *net.TCPConn
+	conn net.Conn
 	//
 	loggingInUser string
 	randomToken   []byte
 }
 
-func NewLoginMessageHandler(conn *net.TCPConn) *LoginMessageHandler {
+func NewLoginMessageHandler(conn net.Conn) *LoginMessageHandler {
 	return &LoginMessageHandler{conn: conn}
 }
 
@@ -42,18 +42,31 @@ func (h *LoginMessageHandler) handleMessage(message *pb.Message) error {
 		database := db.GetDatabase()
 		clientPublicKey, err = database.GetUserPubKey(hashedUsername)
 		if err != nil {
+			loginReply := &pb.LoginPacket{
+				Status: pb.LoginPacket_LOGIN_FAILED,
+			}
+			_ = h.sendLoginPacket(loginReply)
 			return fmt.Errorf("error getting public key from database: %v", err)
 		}
 
+		maxTokenLength := clientPublicKey.Size() - 2*sha256.Size - 2
 		// Generate a random token with client's public key
-		h.randomToken, err = util.GenerateRandomToken(512)
+		h.randomToken, err = util.GenerateRandomToken(maxTokenLength)
 		if err != nil {
+			loginReply := &pb.LoginPacket{
+				Status: pb.LoginPacket_LOGIN_FAILED,
+			}
+			_ = h.sendLoginPacket(loginReply)
 			return fmt.Errorf("error generating random token: %v", err)
 		}
 
 		// Encrypt the random token with the client's public key
 		encryptedToken, err = util.EncodeUsingPubK(h.randomToken, clientPublicKey)
 		if err != nil {
+			loginReply := &pb.LoginPacket{
+				Status: pb.LoginPacket_LOGIN_FAILED,
+			}
+			_ = h.sendLoginPacket(loginReply)
 			return fmt.Errorf("error encrypting random token: %v", err)
 		}
 
@@ -101,14 +114,5 @@ func (h *LoginMessageHandler) sendLoginPacket(reply *pb.LoginPacket) error {
 		},
 	}
 
-	data, err := proto.Marshal(message)
-	if err != nil {
-		return fmt.Errorf("error marshalling message: %v", err)
-	}
-	_, err = h.conn.Write(data)
-	if err != nil {
-		return fmt.Errorf("error sending message: %v", err)
-	}
-
-	return nil
+	return util.SendMessage(h.conn, message)
 }

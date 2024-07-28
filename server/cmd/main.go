@@ -7,20 +7,19 @@ import (
 	"log"
 	"net"
 	"server/internal/actions"
+	"server/internal/util"
 	pb "server/resources/proto"
-
-	"google.golang.org/protobuf/proto"
 )
 
 type Server struct {
 	address string
-	clients map[*net.TCPConn]bool
+	clients map[net.Conn]bool
 }
 
 func NewServer(address string) *Server {
 	return &Server{
 		address: address,
-		clients: make(map[*net.TCPConn]bool),
+		clients: make(map[net.Conn]bool),
 	}
 }
 
@@ -51,18 +50,14 @@ func (s *Server) Start() error {
 	}(listener)
 
 	log.Printf("TLS Server listening on %s\n", s.address)
-	tcpListener, ok := listener.(*net.TCPListener)
-	if !ok {
-		return fmt.Errorf("error converting listener to TCP listener")
-	}
-	s.handleConnections(tcpListener)
+	s.handleConnections(listener)
 
 	return nil
 }
 
-func (s *Server) handleConnections(listener *net.TCPListener) {
+func (s *Server) handleConnections(listener net.Listener) {
 	for {
-		conn, err := listener.AcceptTCP()
+		conn, err := listener.Accept()
 		if err != nil {
 			log.Printf("Error accepting connection: %v\n", err)
 			continue
@@ -73,37 +68,43 @@ func (s *Server) handleConnections(listener *net.TCPListener) {
 	}
 }
 
-func (s *Server) handleClient(conn *net.TCPConn) {
+func (s *Server) handleClient(conn net.Conn) {
 	var messageHandler actions.MessageHandler
 	defer conn.Close()
 	defer delete(s.clients, conn)
 
 	for {
-		buffer := make([]byte, 1024*4)
-		n, err := conn.Read(buffer)
+		message, err := util.ReadMessage(conn)
 		if err != nil {
 			log.Printf("Error reading from client: %v\n", err)
 			return
 		}
 
-		message := &pb.Message{}
-		if err := proto.Unmarshal(buffer[:n], message); err != nil {
-			log.Fatalln("Failed to parse Message:", err)
-		}
-
 		switch message.GetPacket().(type) {
 		case *pb.Message_LoginMessage:
 			messageHandler = actions.NewLoginMessageHandler(conn)
-			break
 		case *pb.Message_RegisterMessage:
 			messageHandler = actions.NewRegisterMessageHandler(conn)
-			break
 		default:
 			log.Printf("Unknown message type: %v\n", message)
+			continue
 		}
+
 		messageContext := actions.NewMessageContext(messageHandler)
 		if err := messageContext.ExecuteStrategy(message); err != nil {
 			log.Printf("Error executing strategy: %v\n", err)
+			// TODO: Send error message to client (e.g. invalid username)
+			errorMsg := &pb.Message{
+				Source: pb.Message_SERVER,
+				Packet: &pb.Message_LoginMessage{
+					LoginMessage: &pb.LoginPacket{
+						Status: pb.LoginPacket_LOGIN_FAILED,
+					},
+				},
+			}
+			if sendErr := util.SendMessage(conn, errorMsg); sendErr != nil {
+				log.Printf("Error sending error message to client: %v\n", sendErr)
+			}
 		}
 	}
 }

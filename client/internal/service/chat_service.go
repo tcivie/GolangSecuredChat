@@ -22,5 +22,5 @@ func (s *ChatService) SendMessage(message *pb.Message) error {
 }
 
 func (s *ChatService) ReceiveMessage() (*pb.Message, error) {
-	return s.Client.ReceiveMessage()
+	return s.Client.GetMessage()
 }

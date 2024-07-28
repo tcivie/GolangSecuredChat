@@ -3,7 +3,6 @@ package service
 import (
 	"client/internal/model"
 	pb "client/resources/proto"
-	"client/util"
 	"errors"
 )
 
@@ -17,27 +16,27 @@ func NewLoginService(client *model.Client) *LoginService {
 	}
 }
 
-func (ls *LoginService) Login() error {
+func (ls *LoginService) Login(username string) error {
 	loginState := &pb.LoginPacket{
 		Status: pb.LoginPacket_REQUEST_TO_LOGIN,
 	}
 	message := &pb.Message{
 		Source:       pb.Message_CLIENT,
-		FromUsername: &ls.client.Username,
+		FromUsername: &username,
 		Packet:       &pb.Message_LoginMessage{LoginMessage: loginState},
 	}
 	if err := ls.client.SendMessage(message); err != nil {
 		return err
 	}
 
-	message, err := util.GetMessage(ls.client.Conn, message)
+	message, err := ls.client.GetMessage()
 	if err != nil {
 		return err
 	}
 
 	loginMessage := message.GetLoginMessage() // Encrypted Token
 	if loginMessage == nil || loginMessage.GetStatus() != pb.LoginPacket_ENCRYPTED_TOKEN {
-		return errors.New("invalid login message")
+		return errors.New("invalid login")
 	}
 
 	// Decrypt token
@@ -53,21 +52,21 @@ func (ls *LoginService) Login() error {
 	}
 	message = &pb.Message{
 		Source:       pb.Message_CLIENT,
-		FromUsername: &ls.client.Username,
+		FromUsername: &username,
 		Packet:       &pb.Message_LoginMessage{LoginMessage: loginState},
 	}
 	if err := ls.client.SendMessage(message); err != nil {
 		return err
 	}
 
-	message, err = util.GetMessage(ls.client.Conn, message)
+	message, err = ls.client.GetMessage()
 	if err != nil {
 		return err
 	}
 
 	loginMessage = message.GetLoginMessage()
 	if loginMessage == nil || loginMessage.GetStatus() != pb.LoginPacket_LOGIN_SUCCESS {
-		return errors.New("invalid login message")
+		return errors.New("invalid login")
 	}
 	return nil
 }

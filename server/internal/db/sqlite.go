@@ -2,9 +2,10 @@ package db
 
 import (
 	"crypto/rsa"
-	crypt "crypto/x509"
 	"database/sql"
 	"fmt"
+	_ "github.com/mattn/go-sqlite3"
+	"math/big"
 	"os"
 	"sync"
 )
@@ -16,7 +17,7 @@ type Database struct {
 var instance *Database
 var once sync.Once
 
-const UsersDBPath = "../../resources/db/users.db"
+const UsersDBPath = "server/resources/db/users.db"
 const createUsersTableSQL = `CREATE TABLE IF NOT EXISTS Users(
     username TEXT PRIMARY KEY,
     pubkey BLOB
@@ -77,7 +78,6 @@ func (db *Database) query(sqlStatement string) (*sql.Rows, error) {
 func (db *Database) GetUserPubKey(username string) (*rsa.PublicKey, error) {
 	var err error
 	var rows *sql.Rows
-	var rsaBubKey *rsa.PublicKey
 	rows, err = db.query(fmt.Sprintf("SELECT pubkey FROM Users WHERE username = '%s';", username))
 	if err != nil {
 		return nil, err
@@ -85,12 +85,21 @@ func (db *Database) GetUserPubKey(username string) (*rsa.PublicKey, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var pubkey []byte
-		if err = rows.Scan(&pubkey); err != nil {
+		var pubkeyBytes []byte
+		if err = rows.Scan(&pubkeyBytes); err != nil {
 			return nil, err
 		}
-		rsaBubKey, err = crypt.ParsePKCS1PublicKey(pubkey)
-		return rsaBubKey, nil
+
+		// Convert the big integer bytes to a big.Int
+		pubkeyInt := new(big.Int).SetBytes(pubkeyBytes)
+
+		// Construct the RSA public key
+		sshPubKey := &rsa.PublicKey{
+			N: pubkeyInt,
+			E: 65537, // Commonly used public exponent
+		}
+
+		return sshPubKey, nil
 	}
 	return nil, fmt.Errorf("user not found")
 }
