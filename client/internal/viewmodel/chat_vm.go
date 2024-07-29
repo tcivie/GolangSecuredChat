@@ -5,17 +5,30 @@ import (
 	"client/internal/service"
 	pb "client/resources/proto"
 	"fmt"
+	"sync"
 )
 
 type ChatViewModel struct {
-	chatService *service.ChatService
-	messages    []model.Message
+	chatService   *service.ChatService
+	messages      map[string][]model.Message
+	currentChat   string
+	messagesMutex sync.RWMutex
+	onBack        *func()
 }
 
 func NewChatViewModel(service *service.ChatService) *ChatViewModel {
 	return &ChatViewModel{
 		chatService: service,
-		messages:    []model.Message{},
+		messages:    make(map[string][]model.Message),
+	}
+}
+
+func (vm *ChatViewModel) SetCurrentChat(username string) {
+	vm.messagesMutex.Lock()
+	defer vm.messagesMutex.Unlock()
+	vm.currentChat = username
+	if _, exists := vm.messages[username]; !exists {
+		vm.messages[username] = []model.Message{}
 	}
 }
 
@@ -25,7 +38,7 @@ func (vm *ChatViewModel) SendMessage(content string) {
 		FromUsername: &vm.chatService.Client.Username,
 		Packet: &pb.Message_ChatMessage{
 			ChatMessage: &pb.ChatPacket{
-				ToUsername: "test", // TODO: Implement this
+				ToUsername: vm.currentChat,
 				Message:    content,
 			},
 		},
@@ -34,7 +47,7 @@ func (vm *ChatViewModel) SendMessage(content string) {
 	if err != nil {
 		vm.AddMessage(model.Message{Content: "Error sending message: " + err.Error(), Sender: "System"})
 	} else {
-		vm.AddMessage(model.Message{Content: content, Sender: "You"})
+		vm.AddMessage(model.Message{Content: content, Sender: "You", Receiver: vm.currentChat})
 	}
 }
 
@@ -47,24 +60,43 @@ func (vm *ChatViewModel) ReceiveMessages(messageChan chan<- model.Message) {
 		}
 		chatMessageContent := chatMessage.GetChatMessage().GetMessage()
 		senderUsername := chatMessage.GetFromUsername()
-		message := model.Message{Content: chatMessageContent, Sender: senderUsername}
-		vm.messages = append(vm.messages, message)
+		message := model.Message{Content: chatMessageContent, Sender: senderUsername, Receiver: vm.currentChat}
+		vm.AddMessage(message)
 		messageChan <- message
 	}
 }
 
 func (vm *ChatViewModel) AddMessage(message model.Message) {
-	vm.messages = append(vm.messages, message)
+	vm.messagesMutex.Lock()
+	defer vm.messagesMutex.Unlock()
+	if message.Receiver == "" {
+		message.Receiver = vm.currentChat
+	}
+	vm.messages[message.Receiver] = append(vm.messages[message.Receiver], message)
 }
 
 func (vm *ChatViewModel) GetMessageCount() int {
-	return len(vm.messages)
+	vm.messagesMutex.RLock()
+	defer vm.messagesMutex.RUnlock()
+	return len(vm.messages[vm.currentChat])
 }
 
 func (vm *ChatViewModel) GetMessageContent(index int) string {
-	if index < 0 || index >= len(vm.messages) {
+	vm.messagesMutex.RLock()
+	defer vm.messagesMutex.RUnlock()
+	if index < 0 || index >= len(vm.messages[vm.currentChat]) {
 		return ""
 	}
-	msg := vm.messages[index]
-	return fmt.Sprintf("%s", msg.Content)
+	msg := vm.messages[vm.currentChat][index]
+	return fmt.Sprintf("%s: %s", msg.Sender, msg.Content)
+}
+
+func (vm *ChatViewModel) SetOnBack(callback func()) {
+	vm.onBack = &callback
+}
+
+func (vm *ChatViewModel) Back() {
+	if vm.onBack != nil {
+		(*vm.onBack)()
+	}
 }

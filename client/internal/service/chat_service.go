@@ -3,6 +3,7 @@ package service
 import (
 	"client/internal/model"
 	pb "client/resources/proto"
+	"errors"
 )
 
 type ChatService struct {
@@ -23,4 +24,33 @@ func (s *ChatService) SendMessage(message *pb.Message) error {
 
 func (s *ChatService) ReceiveMessage() (*pb.Message, error) {
 	return s.Client.GetMessage()
+}
+
+func (s *ChatService) GetUserList() ([]string, error) {
+	userListRequest := &pb.Message{
+		Source:       pb.Message_CLIENT,
+		FromUsername: &s.Client.Username,
+		Packet: &pb.Message_UserListMessage{
+			UserListMessage: &pb.UserListPacket{
+				Status: pb.UserListPacket_REQUEST_USER_LIST,
+			},
+		},
+	}
+
+	err := s.Client.SendMessage(userListRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := s.Client.GetMessage()
+	if err != nil {
+		return nil, err
+	}
+
+	userListMessage := response.GetUserListMessage()
+	if userListMessage == nil {
+		return nil, errors.New("invalid user list response")
+	}
+
+	return userListMessage.GetUsers(), nil
 }

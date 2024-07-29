@@ -17,6 +17,7 @@ type ChatView struct {
 	window    fyne.Window
 	messages  *widget.List
 	input     *widget.Entry
+	header    *widget.Label
 }
 
 func NewChatView(vm *viewmodel.ChatViewModel, app fyne.App) *ChatView {
@@ -34,8 +35,19 @@ func (v *ChatView) Run() {
 	appName := widget.NewLabel("CryptoChat")
 	appName.TextStyle = fyne.TextStyle{Bold: true}
 
+	// Header with current chat partner
+	v.header = widget.NewLabel("Chat with: ")
+	v.header.TextStyle = fyne.TextStyle{Bold: true}
+
 	// Header
-	header := container.NewHBox(logo, layout.NewSpacer(), appName, layout.NewSpacer())
+	header := container.NewVBox(
+		container.NewHBox(
+			logo, layout.NewSpacer(),
+			appName, layout.NewSpacer(),
+			widget.NewButtonWithIcon("", theme.NavigateBackIcon(), v.navigateBack),
+		),
+		v.header,
+	)
 
 	v.messages = widget.NewList(
 		func() int {
@@ -50,14 +62,8 @@ func (v *ChatView) Run() {
 		},
 		func(id widget.ListItemID, item fyne.CanvasObject) {
 			message := v.viewModel.GetMessageContent(id)
-			user, content := parseMessage(message)
-			userLabel := item.(*fyne.Container).Objects[1].(*widget.Label)
 			contentLabel := item.(*fyne.Container).Objects[2].(*widget.Label)
-
-			userLabel.SetText(user + ":")
-			userLabel.TextStyle = fyne.TextStyle{Bold: true}
-
-			contentLabel.SetText(content)
+			contentLabel.SetText(message)
 		},
 	)
 
@@ -83,6 +89,10 @@ func (v *ChatView) Run() {
 
 func (v *ChatView) View() {
 	v.window.Show()
+}
+
+func (v *ChatView) Hide() {
+	v.window.Hide()
 }
 
 func (v *ChatView) submitContent(content string) {
@@ -115,8 +125,10 @@ func (v *ChatView) scrollToBottom() {
 	}
 }
 
-func parseMessage(message string) (string, string) {
-	// Implement message parsing logic here
-	// For now, we'll just return placeholder values
-	return "You", message
+func (v *ChatView) UpdateHeader(username string) {
+	v.header.SetText("Chat with: " + username)
+}
+
+func (v *ChatView) navigateBack() {
+	v.viewModel.Back()
 }

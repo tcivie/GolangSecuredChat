@@ -17,6 +17,7 @@ func NewLoginService(client *model.Client) *LoginService {
 }
 
 func (ls *LoginService) Login(username string) error {
+	ls.client.Username = username
 	loginState := &pb.LoginPacket{
 		Status: pb.LoginPacket_REQUEST_TO_LOGIN,
 	}

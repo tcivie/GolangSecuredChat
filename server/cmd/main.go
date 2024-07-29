@@ -17,13 +17,17 @@ type Server struct {
 	clients       map[net.Conn]bool
 	handlers      map[net.Conn]map[string]actions.MessageHandler
 	handlersMutex sync.Mutex
+	//
+	listOfLoggedInUsers map[string]net.Conn
+	loggedInUsersMutex  sync.RWMutex
 }
 
 func NewServer(address string) *Server {
 	return &Server{
-		address:  address,
-		clients:  make(map[net.Conn]bool),
-		handlers: make(map[net.Conn]map[string]actions.MessageHandler),
+		address:             address,
+		clients:             make(map[net.Conn]bool),
+		handlers:            make(map[net.Conn]map[string]actions.MessageHandler),
+		listOfLoggedInUsers: make(map[string]net.Conn),
 	}
 }
 
@@ -42,9 +46,11 @@ func (s *Server) getOrCreateHandler(conn net.Conn, handlerType string) actions.M
 	var newHandler actions.MessageHandler
 	switch handlerType {
 	case "login":
-		newHandler = actions.NewLoginMessageHandler(conn)
+		newHandler = actions.NewLoginMessageHandler(conn, &s.listOfLoggedInUsers)
 	case "register":
 		newHandler = actions.NewRegisterMessageHandler(conn)
+	case "user_list":
+		newHandler = actions.NewUserListMessageHandler(conn, &s.listOfLoggedInUsers)
 	default:
 		log.Printf("Unknown handler type: %s\n", handlerType)
 		return nil
@@ -99,10 +105,23 @@ func (s *Server) handleConnections(listener net.Listener) {
 	}
 }
 
+func (s *Server) addLoggedInUsers(username string, conn net.Conn) {
+	s.loggedInUsersMutex.Lock()
+	defer s.loggedInUsersMutex.Unlock()
+	s.listOfLoggedInUsers[username] = conn
+}
+
 func (s *Server) removeHandlers(conn net.Conn) {
 	s.handlersMutex.Lock()
+	s.loggedInUsersMutex.Lock()
+	defer s.loggedInUsersMutex.Unlock()
 	defer s.handlersMutex.Unlock()
 	delete(s.handlers, conn)
+	for username, connection := range s.listOfLoggedInUsers {
+		if connection == conn {
+			delete(s.listOfLoggedInUsers, username)
+		}
+	}
 }
 
 func (s *Server) handleClient(conn net.Conn) {
@@ -123,6 +142,8 @@ func (s *Server) handleClient(conn net.Conn) {
 			messageHandler = s.getOrCreateHandler(conn, "login")
 		case *pb.Message_RegisterMessage:
 			messageHandler = s.getOrCreateHandler(conn, "register")
+		case *pb.Message_UserListMessage:
+			messageHandler = s.getOrCreateHandler(conn, "user_list")
 		default:
 			log.Printf("Unknown message type: %v\n", message)
 			continue

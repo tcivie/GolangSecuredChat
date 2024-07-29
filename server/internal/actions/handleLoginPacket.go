@@ -14,12 +14,13 @@ import (
 type LoginMessageHandler struct {
 	conn net.Conn
 	//
-	loggingInUser string
-	randomToken   []byte
+	loggingInUser       string
+	randomToken         []byte
+	listOfLoggedInUsers *map[string]net.Conn
 }
 
-func NewLoginMessageHandler(conn net.Conn) *LoginMessageHandler {
-	return &LoginMessageHandler{conn: conn}
+func NewLoginMessageHandler(conn net.Conn, listOfLoggedInUsers *map[string]net.Conn) *LoginMessageHandler {
+	return &LoginMessageHandler{conn: conn, listOfLoggedInUsers: listOfLoggedInUsers}
 }
 
 func (h *LoginMessageHandler) handleMessage(message *pb.Message) error {
@@ -86,6 +87,7 @@ func (h *LoginMessageHandler) handleMessage(message *pb.Message) error {
 
 		if bytes.Compare(h.randomToken, decodedToken) == 0 {
 			fmt.Println("Login successful")
+			(*h.listOfLoggedInUsers)[h.loggingInUser] = h.conn
 			loginReply = &pb.LoginPacket{
 				Status: pb.LoginPacket_LOGIN_SUCCESS,
 			}

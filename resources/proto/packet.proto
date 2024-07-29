@@ -16,6 +16,7 @@ message Message {
         ExchangeKeyPacket exchangeKeyMessage = 4;
         ChatPacket chatMessage = 5;
         RegisterPacket registerMessage = 6;
+        UserListPacket userListMessage = 7;
     }
 }
 
@@ -69,4 +70,15 @@ message ExchangeKeyPacket {
 message ChatPacket {
     string toUsername = 1;
     string message = 2;
+}
+
+message UserListPacket {
+    enum Status {
+        REQUEST_USER_LIST = 0; // The user requests the list of users
+        USER_LIST = 1; // The server sends the list of users
+        ERROR = 2; // The server sends an error
+    }
+
+    Status status = 1;
+    repeated string users = 2;
 }
