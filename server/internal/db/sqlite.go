@@ -105,7 +105,18 @@ func (db *Database) GetUserPubKey(username string) (*rsa.PublicKey, error) {
 }
 
 func (db *Database) CreateNewUser(username string, pubkey []byte) error {
-	stmt, err := db.conn.Prepare("INSERT OR IGNORE INTO Users(username, pubkey) VALUES(?, ?)")
+	// First, check if a user with the same public key already exists
+	var existingUsername string
+	err := db.conn.QueryRow("SELECT username FROM Users WHERE pubkey = ?", pubkey).Scan(&existingUsername)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("error checking for existing public key: %v", err)
+	}
+	if err == nil {
+		return fmt.Errorf("a user with this public key already exists: %s", existingUsername)
+	}
+
+	// If we've reached here, no user with this public key exists, so we can proceed with insertion
+	stmt, err := db.conn.Prepare("INSERT INTO Users(username, pubkey) VALUES(?, ?)")
 	if err != nil {
 		return fmt.Errorf("error preparing statement: %v", err)
 	}

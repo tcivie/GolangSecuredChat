@@ -20,6 +20,7 @@ func main() {
 
 		loginVM.SetOnLogin(func() {
 			chatView.View()
+			go chatView.ReceiveMessages()
 		})
 		chatView.Run()
 		loginView.Run()

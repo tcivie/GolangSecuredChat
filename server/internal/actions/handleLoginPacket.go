@@ -24,6 +24,7 @@ func NewLoginMessageHandler(conn net.Conn) *LoginMessageHandler {
 
 func (h *LoginMessageHandler) handleMessage(message *pb.Message) error {
 	var err error
+	var loginReply *pb.LoginPacket
 	loginMessage := message.GetLoginMessage()
 	if loginMessage == nil {
 		return fmt.Errorf("unable to parse login message")
@@ -42,10 +43,10 @@ func (h *LoginMessageHandler) handleMessage(message *pb.Message) error {
 		database := db.GetDatabase()
 		clientPublicKey, err = database.GetUserPubKey(hashedUsername)
 		if err != nil {
-			loginReply := &pb.LoginPacket{
+			loginReply = &pb.LoginPacket{
 				Status: pb.LoginPacket_LOGIN_FAILED,
 			}
-			_ = h.sendLoginPacket(loginReply)
+
 			return fmt.Errorf("error getting public key from database: %v", err)
 		}
 
@@ -53,56 +54,52 @@ func (h *LoginMessageHandler) handleMessage(message *pb.Message) error {
 		// Generate a random token with client's public key
 		h.randomToken, err = util.GenerateRandomToken(maxTokenLength)
 		if err != nil {
-			loginReply := &pb.LoginPacket{
+			loginReply = &pb.LoginPacket{
 				Status: pb.LoginPacket_LOGIN_FAILED,
 			}
-			_ = h.sendLoginPacket(loginReply)
-			return fmt.Errorf("error generating random token: %v", err)
+			fmt.Println("error generating random token: %v", err)
+			break
 		}
 
 		// Encrypt the random token with the client's public key
 		encryptedToken, err = util.EncodeUsingPubK(h.randomToken, clientPublicKey)
 		if err != nil {
-			loginReply := &pb.LoginPacket{
+			loginReply = &pb.LoginPacket{
 				Status: pb.LoginPacket_LOGIN_FAILED,
 			}
-			_ = h.sendLoginPacket(loginReply)
-			return fmt.Errorf("error encrypting random token: %v", err)
+			fmt.Println("error encrypting random token: %v", err)
+			break
 		}
 
 		// Send the encrypted token to the client
-		loginReply := &pb.LoginPacket{
+		loginReply = &pb.LoginPacket{
 			Status: pb.LoginPacket_ENCRYPTED_TOKEN,
 			Token:  encryptedToken,
 		}
-		err = h.sendLoginPacket(loginReply)
 		break
 	//case pb.LoginPacket_ENCRYPTED_TOKEN:
 	//	fmt.Println("Received encrypted token")
 	//	break
 	case pb.LoginPacket_DECRYPTED_TOKEN:
-		var loginReply *pb.LoginPacket
-
 		fmt.Println("Received decrypted token")
 		decodedToken := loginMessage.GetToken()
 
 		if bytes.Compare(h.randomToken, decodedToken) == 0 {
+			fmt.Println("Login successful")
 			loginReply = &pb.LoginPacket{
 				Status: pb.LoginPacket_LOGIN_SUCCESS,
 			}
 		} else {
+			fmt.Println("Login failed")
 			loginReply = &pb.LoginPacket{
 				Status: pb.LoginPacket_LOGIN_FAILED,
 			}
 		}
-		err = h.sendLoginPacket(loginReply)
 		break
-	//case pb.LoginPacket_LOGIN_REPLY:
-	//	fmt.Println("Received login reply")
-	//	break
 	default:
 		return fmt.Errorf("unknown login message status")
 	}
+	_ = h.sendLoginPacket(loginReply)
 	return err
 }
 

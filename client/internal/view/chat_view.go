@@ -78,8 +78,6 @@ func (v *ChatView) Run() {
 
 	v.window.SetContent(paddedContent)
 
-	go v.receiveMessages()
-
 	v.window.Resize(fyne.NewSize(400, 600))
 }
 
@@ -95,7 +93,7 @@ func (v *ChatView) submitContent(content string) {
 	}
 }
 
-func (v *ChatView) receiveMessages() {
+func (v *ChatView) ReceiveMessages() {
 	messageChan := make(chan model.Message)
 	go v.viewModel.ReceiveMessages(messageChan)
 	for message := range messageChan {

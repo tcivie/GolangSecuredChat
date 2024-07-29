@@ -9,18 +9,49 @@ import (
 	"server/internal/actions"
 	"server/internal/util"
 	pb "server/resources/proto"
+	"sync"
 )
 
 type Server struct {
-	address string
-	clients map[net.Conn]bool
+	address       string
+	clients       map[net.Conn]bool
+	handlers      map[net.Conn]map[string]actions.MessageHandler
+	handlersMutex sync.Mutex
 }
 
 func NewServer(address string) *Server {
 	return &Server{
-		address: address,
-		clients: make(map[net.Conn]bool),
+		address:  address,
+		clients:  make(map[net.Conn]bool),
+		handlers: make(map[net.Conn]map[string]actions.MessageHandler),
 	}
+}
+
+func (s *Server) getOrCreateHandler(conn net.Conn, handlerType string) actions.MessageHandler {
+	s.handlersMutex.Lock()
+	defer s.handlersMutex.Unlock()
+
+	if _, exists := s.handlers[conn]; !exists {
+		s.handlers[conn] = make(map[string]actions.MessageHandler)
+	}
+
+	if handler, exists := s.handlers[conn][handlerType]; exists {
+		return handler
+	}
+
+	var newHandler actions.MessageHandler
+	switch handlerType {
+	case "login":
+		newHandler = actions.NewLoginMessageHandler(conn)
+	case "register":
+		newHandler = actions.NewRegisterMessageHandler(conn)
+	default:
+		log.Printf("Unknown handler type: %s\n", handlerType)
+		return nil
+	}
+
+	s.handlers[conn][handlerType] = newHandler
+	return newHandler
 }
 
 func (s *Server) Start() error {
@@ -68,10 +99,16 @@ func (s *Server) handleConnections(listener net.Listener) {
 	}
 }
 
+func (s *Server) removeHandlers(conn net.Conn) {
+	s.handlersMutex.Lock()
+	defer s.handlersMutex.Unlock()
+	delete(s.handlers, conn)
+}
+
 func (s *Server) handleClient(conn net.Conn) {
-	var messageHandler actions.MessageHandler
 	defer conn.Close()
 	defer delete(s.clients, conn)
+	defer s.removeHandlers(conn)
 
 	for {
 		message, err := util.ReadMessage(conn)
@@ -80,11 +117,12 @@ func (s *Server) handleClient(conn net.Conn) {
 			return
 		}
 
+		var messageHandler actions.MessageHandler
 		switch message.GetPacket().(type) {
 		case *pb.Message_LoginMessage:
-			messageHandler = actions.NewLoginMessageHandler(conn)
+			messageHandler = s.getOrCreateHandler(conn, "login")
 		case *pb.Message_RegisterMessage:
-			messageHandler = actions.NewRegisterMessageHandler(conn)
+			messageHandler = s.getOrCreateHandler(conn, "register")
 		default:
 			log.Printf("Unknown message type: %v\n", message)
 			continue
@@ -93,7 +131,6 @@ func (s *Server) handleClient(conn net.Conn) {
 		messageContext := actions.NewMessageContext(messageHandler)
 		if err := messageContext.ExecuteStrategy(message); err != nil {
 			log.Printf("Error executing strategy: %v\n", err)
-			// TODO: Send error message to client (e.g. invalid username)
 			errorMsg := &pb.Message{
 				Source: pb.Message_SERVER,
 				Packet: &pb.Message_LoginMessage{
