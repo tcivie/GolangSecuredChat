@@ -41,17 +41,18 @@ func main() {
 			userListView.Hide()
 			chatView.View()
 			chatVM.SetCurrentChat(selectedUser)
-			chatView.UpdateHeader(selectedUser)
 			go chatView.ReceiveMessages()
+			chatView.UpdateHeader(selectedUser)
 		})
 
 		chatVM.SetOnBack(func() {
 			chatView.Hide()
 			userListView.Show()
 		})
+		//chatView.Run()
+		//userListView.Run()
 		loginView.Run()
-		userListView.Run()
-		chatView.Run()
+		loginView.Show()
 		a.Run()
 	} else {
 		a := app.New()

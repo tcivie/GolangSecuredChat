@@ -52,11 +52,13 @@ func (v *UserListView) GetUsers() {
 }
 
 func (v *UserListView) Show() {
+	v.Run()
 	v.window.Show()
 }
 
 func (v *UserListView) Hide() {
-	v.window.Hide()
+	//v.window.Hide()
+	v.window.Close()
 }
 
 func (v *UserListView) onUserSelected(selectedUser string) {
@@ -65,7 +67,6 @@ func (v *UserListView) onUserSelected(selectedUser string) {
 		// Handle error (e.g., log it)
 		return
 	}
-	v.window.Close()
 	if onSelect != nil {
 		(*onSelect)(selectedUser)
 	}

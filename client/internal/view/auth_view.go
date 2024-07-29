@@ -89,7 +89,6 @@ func (v *AuthView) Run() {
 	v.window.Resize(fyne.NewSize(400, 600))
 
 	go v.listenForStatusUpdates()
-	v.window.ShowAndRun()
 }
 
 func (v *AuthView) attemptLogin() {
@@ -124,6 +123,6 @@ func (v *AuthView) listenForStatusUpdates() {
 	}
 }
 
-func (v *AuthView) View() {
+func (v *AuthView) Show() {
 	v.window.Show()
 }

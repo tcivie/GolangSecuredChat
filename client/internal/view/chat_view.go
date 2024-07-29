@@ -88,11 +88,12 @@ func (v *ChatView) Run() {
 }
 
 func (v *ChatView) View() {
+	v.Run()
 	v.window.Show()
 }
 
 func (v *ChatView) Hide() {
-	v.window.Hide()
+	v.window.Close()
 }
 
 func (v *ChatView) submitContent(content string) {
