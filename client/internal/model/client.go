@@ -113,7 +113,7 @@ func (c *Client) Close() error {
 	return c.Conn.Close()
 }
 
-func (c *Client) DecryptMessage(message []byte) ([]byte, error) {
+func (c *Client) DecryptMessageWithPrivateKey(message []byte) ([]byte, error) {
 	decrypted, err := rsa.DecryptOAEP(sha256.New(), nil, c.privateKey, message, nil)
 	if err != nil {
 		return nil, fmt.Errorf("decryption error: %v", err)

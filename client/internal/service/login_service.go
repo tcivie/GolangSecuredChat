@@ -41,7 +41,7 @@ func (ls *LoginService) Login(username string) error {
 	}
 
 	// Decrypt token
-	decryptedToken, err := ls.client.DecryptMessage(loginMessage.GetToken())
+	decryptedToken, err := ls.client.DecryptMessageWithPrivateKey(loginMessage.GetToken())
 	if err != nil {
 		return err
 	}

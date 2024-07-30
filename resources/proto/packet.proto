@@ -50,26 +50,25 @@ message RegisterPacket {
 
 message ExchangeKeyPacket {
     enum Status {
-        REQUEST_TO_EXCHANGE_KEY = 0; // The user requests to exchange key with another user
+        REQUEST_FOR_USER_PUBLIC_KEY = 0; // The user requests another user's public key form the server
 
         PUB_KEY_FROM_SERVER = 1; // The server sends the requested user's public key to the user
-        MESSAGE_WITH_SYM_KEY = 2; // The user sends the encrypted message with the symmetric key
-        EXCHANGE_KEY_REPLY = 3; // The client replies with the exchange key status
-    }
-    enum ExchangeKeyStatus {
-        EXCHANGE_KEY_SUCCESS = 0;
-        EXCHANGE_KEY_FAILED = 1;
+        MESSAGE_WITH_PUB_KEY = 2; // The user sends it's public key to the requested user (Encrypted with the requested user's public key)
+
+        // REQUEST_FOR_USER_PUBLIC_KEY // The chatter validates the public key (That it indeed belongs to the user)
+        REPLY_WITH_SYM_KEY = 3; // The chatter sends the symmetric key to the user (Encrypted with the user's public key)
+        ERROR = 4; // The server/user sends an error
     }
     Status status = 1;
     optional string toUsername = 2; // To whom the packet is addressed
-    optional bytes publicKey = 3; // The public key of the user
+    optional bytes key = 3; // The public key of the user
     optional bytes encryptedMessage = 4; // The encrypted message with the symmetric key
-    optional ExchangeKeyStatus exchangeKeyStatus = 5; // The status of the exchange key (Success or Failed)
 }
 
 message ChatPacket {
+    // TODO: Add handle error
     string toUsername = 1;
-    string message = 2;
+    bytes message = 2;
 }
 
 message UserListPacket {

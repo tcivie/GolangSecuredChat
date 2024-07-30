@@ -48,7 +48,7 @@ func (h *LoginMessageHandler) handleMessage(message *pb.Message) error {
 				Status: pb.LoginPacket_LOGIN_FAILED,
 			}
 
-			return fmt.Errorf("error getting public key from database: %v", err)
+			fmt.Printf("error getting public key from database: %v", err)
 		}
 
 		maxTokenLength := clientPublicKey.Size() - 2*sha256.Size - 2
@@ -58,7 +58,7 @@ func (h *LoginMessageHandler) handleMessage(message *pb.Message) error {
 			loginReply = &pb.LoginPacket{
 				Status: pb.LoginPacket_LOGIN_FAILED,
 			}
-			fmt.Println("error generating random token: %v", err)
+			fmt.Printf("error generating random token: %v\n", err)
 			break
 		}
 
@@ -68,7 +68,7 @@ func (h *LoginMessageHandler) handleMessage(message *pb.Message) error {
 			loginReply = &pb.LoginPacket{
 				Status: pb.LoginPacket_LOGIN_FAILED,
 			}
-			fmt.Println("error encrypting random token: %v", err)
+			fmt.Printf("error encrypting random token: %v\n", err)
 			break
 		}
 

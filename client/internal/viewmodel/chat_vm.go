@@ -9,11 +9,13 @@ import (
 )
 
 type ChatViewModel struct {
-	chatService   *service.ChatService
-	messages      map[string][]model.Message
-	currentChat   string
-	messagesMutex sync.RWMutex
-	onBack        *func()
+	chatService             *service.ChatService
+	chatterHandshakeService *service.ChatterHandshakeService
+	messages                map[string][]model.Message
+	currentChat             string
+	messagesMutex           sync.RWMutex
+	chatter                 *model.Chatter
+	onBack                  *func()
 }
 
 func NewChatViewModel(service *service.ChatService) *ChatViewModel {
@@ -30,6 +32,16 @@ func (vm *ChatViewModel) SetCurrentChat(username string) {
 	if _, exists := vm.messages[username]; !exists {
 		vm.messages[username] = []model.Message{}
 	}
+	if err := vm.handleHandshakeWithUser(username); err != nil {
+		vm.AddMessage(model.Message{Content: "Error handshaking with user: " + err.Error(), Sender: "System"})
+	}
+}
+
+func (vm *ChatViewModel) handleHandshakeWithUser(username string) (err error) {
+	vm.chatter = model.NewChatter(username)
+	vm.chatterHandshakeService = service.NewChatterHandshakeService(vm.chatService.Client, vm.chatter)
+	err = vm.chatterHandshakeService.Handshake()
+	return
 }
 
 func (vm *ChatViewModel) SendMessage(content string) {
@@ -38,8 +50,8 @@ func (vm *ChatViewModel) SendMessage(content string) {
 		FromUsername: &vm.chatService.Client.Username,
 		Packet: &pb.Message_ChatMessage{
 			ChatMessage: &pb.ChatPacket{
-				ToUsername: vm.currentChat,
-				Message:    content,
+				ToUsername: vm.chatter.Username,
+				Message:    vm.chatter.Encrypt(content),
 			},
 		},
 	}
@@ -47,7 +59,7 @@ func (vm *ChatViewModel) SendMessage(content string) {
 	if err != nil {
 		vm.AddMessage(model.Message{Content: "Error sending message: " + err.Error(), Sender: "System"})
 	} else {
-		vm.AddMessage(model.Message{Content: content, Sender: "You", Receiver: vm.currentChat})
+		vm.AddMessage(model.Message{Content: content, Sender: "You", Receiver: vm.chatter.Username})
 	}
 }
 
@@ -58,9 +70,10 @@ func (vm *ChatViewModel) ReceiveMessages(messageChan chan<- model.Message) {
 			messageChan <- model.Message{Content: "Error receiving message: " + err.Error(), Sender: "System"}
 			continue
 		}
-		chatMessageContent := chatMessage.GetChatMessage().GetMessage()
+		encryptedChatMessageContent := chatMessage.GetChatMessage().GetMessage()
+		chatMessageContent := vm.chatter.Decrypt(encryptedChatMessageContent)
 		senderUsername := chatMessage.GetFromUsername()
-		message := model.Message{Content: chatMessageContent, Sender: senderUsername, Receiver: vm.currentChat}
+		message := model.Message{Content: chatMessageContent, Sender: senderUsername, Receiver: senderUsername}
 		vm.AddMessage(message)
 		messageChan <- message
 	}

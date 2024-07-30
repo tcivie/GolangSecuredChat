@@ -1,6 +1,7 @@
 package viewmodel
 
 import (
+	"client/internal/model"
 	"client/internal/service"
 	"fmt"
 )
@@ -9,6 +10,7 @@ type UserListViewModel struct {
 	chatService *service.ChatService
 	Users       []string
 	onSelect    *func(string)
+	chatters    *map[string]model.Chatter
 }
 
 func NewUserListViewModel(service *service.ChatService) *UserListViewModel {
@@ -16,6 +18,19 @@ func NewUserListViewModel(service *service.ChatService) *UserListViewModel {
 		chatService: service,
 		Users:       []string{},
 	}
+}
+
+func (vm *UserListViewModel) WaitForMessages() {
+	go func() {
+		for {
+			message, err := vm.chatService.ReceiveMessage()
+			if err != nil {
+				continue
+			}
+
+		}
+	}()
+
 }
 
 func (vm *UserListViewModel) FetchUsers() {
