@@ -71,7 +71,7 @@ func (v *ChatView) Run() {
 	v.input.SetPlaceHolder("Type a message...")
 
 	send := widget.NewButtonWithIcon("Send", theme.MailSendIcon(), func() {
-		v.submitContent(v.input.Text)
+		v.submitContent(v.input.Text, v.viewModel.CurrentChatter)
 	})
 	send.Importance = widget.HighImportance
 
@@ -96,9 +96,9 @@ func (v *ChatView) Hide() {
 	v.window.Close()
 }
 
-func (v *ChatView) submitContent(content string) {
+func (v *ChatView) submitContent(content string, receiver string) {
 	if content != "" {
-		v.viewModel.SendMessage(content)
+		v.viewModel.SendMessage(content, receiver)
 		v.input.SetText("")
 		v.refreshMessageView()
 	}

@@ -1,45 +1,49 @@
 package main
 
 import (
+	"client/internal/model"
 	"client/internal/service"
 	"client/internal/view"
 	"client/internal/viewmodel"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/widget"
+	"os"
 	"time"
 )
 
 func main() {
 	a := app.New()
-	chatService, err := service.NewChatService("localhost:8080", "client/resources/private2")
+	client, err := model.NewClient("localhost:8080", os.Getenv("PRIVATE_KEY"))
 	if err == nil {
-		loginVM := viewmodel.NewAuthViewModel(chatService.Client)
+		commService := service.NewCommunicationService(client)
+
+		loginVM := viewmodel.NewAuthViewModel(commService)
 		loginView := view.NewLoginView(loginVM, a)
 
-		userListVM := viewmodel.NewUserListViewModel(chatService)
+		userListVM := viewmodel.NewUserListViewModel(commService)
 		userListView := view.NewUserListView(userListVM, a)
 
-		chatVM := viewmodel.NewChatViewModel(chatService)
+		chatVM := viewmodel.NewChatViewModel(commService)
 		chatView := view.NewChatView(chatVM, a)
 
 		loginVM.SetOnLogin(func() {
 			userListView.Show()
 			userListVM.FetchUsers()
-
 			go func() {
 				ticker := time.NewTicker(10 * time.Second)
 				defer ticker.Stop()
 
 				for range ticker.C {
-					userListView.GetUsers()
+					userListVM.FetchUsers()
 					userListView.Update()
 				}
 			}()
+			chatVM.WaitForHandshakeMessages()
 		})
 
 		userListVM.SetOnSelect(func(selectedUser string) {
-			userListView.Hide()
 			chatView.View()
+			userListView.Hide()
 			chatVM.SetCurrentChat(selectedUser)
 			go chatView.ReceiveMessages()
 			chatView.UpdateHeader(selectedUser)
@@ -49,8 +53,7 @@ func main() {
 			chatView.Hide()
 			userListView.Show()
 		})
-		//chatView.Run()
-		//userListView.Run()
+
 		loginView.Run()
 		loginView.Show()
 		a.Run()
@@ -60,6 +63,5 @@ func main() {
 		errorMessage := widget.NewLabel(err.Error())
 		errWindow.SetContent(errorMessage)
 		errWindow.ShowAndRun()
-		a.Run()
 	}
 }

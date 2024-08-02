@@ -1,7 +1,10 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Start Client" type="GoApplicationRunConfiguration" factoryName="Go Application" singleton="false">
+  <configuration default="false" name="Start Client - tcivie" type="GoApplicationRunConfiguration" factoryName="Go Application" singleton="true">
     <module name="GolangSecuredChat" />
     <working_directory value="$PROJECT_DIR$" />
+    <envs>
+      <env name="PRIVATE_KEY" value="client/resources/private" />
+    </envs>
     <kind value="FILE" />
     <directory value="$PROJECT_DIR$" />
     <filePath value="$PROJECT_DIR$/client/cmd/main.go" />

@@ -51,6 +51,10 @@ func (s *Server) getOrCreateHandler(conn net.Conn, handlerType string) actions.M
 		newHandler = actions.NewRegisterMessageHandler(conn)
 	case "user_list":
 		newHandler = actions.NewUserListMessageHandler(conn, &s.listOfLoggedInUsers)
+	case "chat":
+		newHandler = actions.NewChatMessageHandler(&s.listOfLoggedInUsers)
+	case "exchange_keys":
+		newHandler = actions.NewExchangeKeyPacket(&s.listOfLoggedInUsers)
 	default:
 		log.Printf("Unknown handler type: %s\n", handlerType)
 		return nil
@@ -144,6 +148,10 @@ func (s *Server) handleClient(conn net.Conn) {
 			messageHandler = s.getOrCreateHandler(conn, "register")
 		case *pb.Message_UserListMessage:
 			messageHandler = s.getOrCreateHandler(conn, "user_list")
+		case *pb.Message_ChatMessage:
+			messageHandler = s.getOrCreateHandler(conn, "chat")
+		case *pb.Message_ExchangeKeyMessage:
+			messageHandler = s.getOrCreateHandler(conn, "exchange_keys")
 		default:
 			log.Printf("Unknown message type: %v\n", message)
 			continue

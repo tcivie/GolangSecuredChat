@@ -1,35 +1,31 @@
 package service
 
 import (
-	"client/internal/model"
 	pb "client/resources/proto"
 	"errors"
 )
 
 type ChatService struct {
-	Client *model.Client
+	commService *CommunicationService
 }
 
-func NewChatService(address string, privateKeyPath string) (*ChatService, error) {
-	client, err := model.NewClient(address, privateKeyPath)
-	if err != nil {
-		return nil, err
-	}
-	return &ChatService{Client: client}, nil
+func NewChatService(commService *CommunicationService) *ChatService {
+	return &ChatService{commService: commService}
 }
 
 func (s *ChatService) SendMessage(message *pb.Message) error {
-	return s.Client.SendMessage(message)
+	return s.commService.SendMessage(message)
 }
 
 func (s *ChatService) ReceiveMessage() (*pb.Message, error) {
-	return s.Client.GetMessage()
+	chatMsg := <-s.commService.GetChatChannel()
+	return &pb.Message{Packet: &pb.Message_ChatMessage{ChatMessage: chatMsg}}, nil
 }
 
 func (s *ChatService) GetUserList() ([]string, error) {
 	userListRequest := &pb.Message{
 		Source:       pb.Message_CLIENT,
-		FromUsername: &s.Client.Username,
+		FromUsername: &s.commService.GetClient().Username,
 		Packet: &pb.Message_UserListMessage{
 			UserListMessage: &pb.UserListPacket{
 				Status: pb.UserListPacket_REQUEST_USER_LIST,
@@ -37,17 +33,14 @@ func (s *ChatService) GetUserList() ([]string, error) {
 		},
 	}
 
-	err := s.Client.SendMessage(userListRequest)
+	err := s.commService.SendMessage(userListRequest)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := s.Client.GetMessage()
-	if err != nil {
-		return nil, err
-	}
+	userListChan := s.commService.GetUserListChannel()
+	userListMessage := <-userListChan
 
-	userListMessage := response.GetUserListMessage()
 	if userListMessage == nil {
 		return nil, errors.New("invalid user list response")
 	}

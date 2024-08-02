@@ -1,23 +1,22 @@
 package service
 
 import (
-	"client/internal/model"
 	pb "client/resources/proto"
 	"errors"
 )
 
 type RegisterService struct {
-	client *model.Client
+	commService *CommunicationService
 }
 
-func NewRegisterService(client *model.Client) *RegisterService {
+func NewRegisterService(commService *CommunicationService) *RegisterService {
 	return &RegisterService{
-		client: client,
+		commService: commService,
 	}
 }
 
 func (rs *RegisterService) Register(username string) error {
-	pubKey := rs.client.GetPubKey()
+	pubKey := rs.commService.GetClient().GetPubKey()
 	if pubKey == nil {
 		return errors.New("public key not found")
 	}
@@ -32,15 +31,14 @@ func (rs *RegisterService) Register(username string) error {
 		Packet:       &pb.Message_RegisterMessage{RegisterMessage: registerState},
 	}
 
-	if err := rs.client.SendMessage(message); err != nil {
+	if err := rs.commService.SendMessage(message); err != nil {
 		return err
 	}
 
-	message, err := rs.client.GetMessage()
-	if err != nil {
-		return err
-	}
-	registerMessage := message.GetRegisterMessage()
+	// Wait for response on the register channel
+	registerChan := rs.commService.GetRegisterChannel()
+	registerMessage := <-registerChan
+
 	if registerMessage == nil || registerMessage.GetStatus() != pb.RegisterPacket_REGISTER_SUCCESS {
 		return errors.New("invalid register message")
 	}

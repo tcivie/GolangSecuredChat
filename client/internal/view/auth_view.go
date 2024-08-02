@@ -110,10 +110,10 @@ func (v *AuthView) updateStatus(err error, action string, onLogin *func()) {
 		v.statusChan <- action + " failed: " + err.Error()
 	} else {
 		v.statusChan <- action + " successful!"
-		v.window.Close()
 		if onLogin != nil {
 			(*onLogin)()
 		}
+		v.window.Close()
 	}
 }
 

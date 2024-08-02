@@ -84,20 +84,23 @@ func (c *Client) GetMessage() (*pb.Message, error) {
 	// Read the message length
 	var length uint32
 	err := binary.Read(c.Conn, binary.BigEndian, &length)
-	log.Println("GetMessage length: ", length)
 	if err != nil {
+		if err == io.EOF {
+			return nil, fmt.Errorf("connection closed by server")
+		}
 		log.Println("Error reading message length: ", err)
 		return nil, err
 	}
+	log.Println("GetMessage length: ", length)
 
 	// Read the message data
 	data := make([]byte, length)
 	_, err = io.ReadFull(c.Conn, data)
-	log.Println("GetMessage data: ", data)
 	if err != nil {
 		log.Println("Error reading message data: ", err)
 		return nil, err
 	}
+	log.Println("GetMessage data: ", data)
 
 	// Unmarshal the message
 	message := &pb.Message{}

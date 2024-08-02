@@ -40,6 +40,10 @@ func (c *Chatter) EncryptWithPublicKey(message []byte) ([]byte, error) {
 	return rsa.EncryptOAEP(sha256.New(), rand.Reader, c.publicKey, message, nil)
 }
 
+func (c *Chatter) GetPubKey() *rsa.PublicKey {
+	return c.publicKey
+}
+
 func (c *Chatter) Encrypt(message string) []byte {
 	encryptedMessage := make([]byte, len(message))
 	(*c.cypherBlock).Encrypt(encryptedMessage, []byte(message))

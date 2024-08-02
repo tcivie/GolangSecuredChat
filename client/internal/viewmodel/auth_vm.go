@@ -1,7 +1,6 @@
 package viewmodel
 
 import (
-	"client/internal/model"
 	"client/internal/service"
 	"fmt"
 )
@@ -13,10 +12,10 @@ type AuthViewModel struct {
 	onLogin         *func()
 }
 
-func NewAuthViewModel(client *model.Client) *AuthViewModel {
+func NewAuthViewModel(commService *service.CommunicationService) *AuthViewModel {
 	return &AuthViewModel{
-		loginService:    service.NewLoginService(client),
-		registerService: service.NewRegisterService(client),
+		loginService:    service.NewLoginService(commService),
+		registerService: service.NewRegisterService(commService),
 	}
 }
 
