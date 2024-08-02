@@ -2,6 +2,7 @@ package service
 
 import (
 	"client/internal/model"
+	"client/internal/utils"
 	pb "client/resources/proto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -12,10 +13,10 @@ import (
 
 type ChatterHandshakeService struct {
 	commService *CommunicationService
-	Chatters    map[string]*model.Chatter
+	Chatters    *map[string]*model.Chatter
 }
 
-func NewChatterHandshakeService(commService *CommunicationService, chatters map[string]*model.Chatter) *ChatterHandshakeService {
+func NewChatterHandshakeService(commService *CommunicationService, chatters *map[string]*model.Chatter) *ChatterHandshakeService {
 	return &ChatterHandshakeService{
 		commService: commService,
 		Chatters:    chatters,
@@ -26,7 +27,7 @@ func (s *ChatterHandshakeService) Handshake(username string) error {
 	// Request Chatter's public key from server
 	publicKeyRequest := &pb.ExchangeKeyPacket{
 		Status:     pb.ExchangeKeyPacket_REQUEST_FOR_USER_PUBLIC_KEY,
-		ToUsername: &s.Chatters[username].Username,
+		ToUsername: &(*s.Chatters)[username].Username,
 	}
 	err := s.sendHandshakeMessage(publicKeyRequest)
 	if err != nil {
@@ -47,10 +48,12 @@ func (s *ChatterHandshakeService) Handshake(username string) error {
 		N: pubkeyInt,
 		E: 65537, // Commonly used public exponent
 	}
-	s.Chatters[username].SetPublicKey(sshPubKey)
+	fmt.Printf("Setting public key (%s) for %s\n", utils.DebugPrintPublicKey(sshPubKey), username)
+	(*s.Chatters)[username].SetPublicKey(sshPubKey)
 
 	// Encrypt our username with Chatter's public key
-	encryptedUsername, err := s.Chatters[username].EncryptWithPublicKey([]byte(s.commService.GetClient().Username))
+	fmt.Printf("Encrypting with public key (%s) for %s\n", utils.DebugPrintPublicKey(sshPubKey), username)
+	encryptedUsername, err := (*s.Chatters)[username].EncryptWithPublicKey([]byte(s.commService.GetClient().Username))
 	if err != nil {
 		fmt.Println("Error encrypting public key: ", err)
 		return err
@@ -60,7 +63,7 @@ func (s *ChatterHandshakeService) Handshake(username string) error {
 	publicKeyResponse := &pb.ExchangeKeyPacket{
 		Status:           pb.ExchangeKeyPacket_REQ_FOR_SYM_KEY,
 		EncryptedMessage: encryptedUsername,
-		ToUsername:       &s.Chatters[username].Username,
+		ToUsername:       &(*s.Chatters)[username].Username,
 	}
 	err = s.sendHandshakeMessage(publicKeyResponse)
 	if err != nil {
@@ -75,12 +78,13 @@ func (s *ChatterHandshakeService) Handshake(username string) error {
 	}
 
 	// Decrypt the AES key with our private key
+	fmt.Printf("Decrpyting with private key for this public (%s) for %s\n", utils.DebugPrintPublicKey(s.commService.GetClient().GetPubKey()), s.commService.GetClient().Username)
 	decryptedAESKey, err := s.commService.GetClient().DecryptMessageWithPrivateKey(messageWithSymKey.GetEncryptedMessage())
 	if err != nil {
 		fmt.Println("Error decrypting AES key: ", err)
 		return err
 	}
-	s.Chatters[username].SetAES256Key(decryptedAESKey)
+	(*s.Chatters)[username].SetAES256Key(decryptedAESKey)
 	return nil
 }
 
@@ -88,10 +92,12 @@ func (s *ChatterHandshakeService) HandleReceiveHandshake(message *pb.Message) {
 	var response *pb.ExchangeKeyPacket
 	fromUsername := message.GetFromUsername()
 	exchangeKeyMessage := message.GetExchangeKeyMessage()
+	destinationUsername := exchangeKeyMessage.GetToUsername()
 
 	switch exchangeKeyMessage.GetStatus() {
 	case pb.ExchangeKeyPacket_REQ_FOR_SYM_KEY:
 		// Decrypt the exchangeKeyMessage with our private key
+		fmt.Printf("Decrpyting with private key for this public (%s) for %s\n", utils.DebugPrintPublicKey(s.commService.GetClient().GetPubKey()), s.commService.GetClient().Username)
 		decryptedMessage, err := s.commService.GetClient().DecryptMessageWithPrivateKey(exchangeKeyMessage.GetEncryptedMessage())
 		if err != nil {
 			fmt.Println("Error decrypting exchangeKeyMessage: ", err)
@@ -100,11 +106,11 @@ func (s *ChatterHandshakeService) HandleReceiveHandshake(message *pb.Message) {
 
 		username := string(decryptedMessage[:])
 
-		if username != s.commService.GetClient().Username {
+		if username != fromUsername {
 			fmt.Println("Invalid username in request for symmetric key")
 			response = &pb.ExchangeKeyPacket{
 				Status:     pb.ExchangeKeyPacket_ERROR,
-				ToUsername: &s.Chatters[fromUsername].Username,
+				ToUsername: &(*s.Chatters)[fromUsername].Username,
 			}
 			break
 		}
@@ -116,19 +122,21 @@ func (s *ChatterHandshakeService) HandleReceiveHandshake(message *pb.Message) {
 		}
 	case pb.ExchangeKeyPacket_PUB_KEY_FROM_SERVER_PASSIVE:
 		// Update the chatter with the public key
-		if exchangeKeyMessage.GetToUsername() != s.Chatters[fromUsername].Username {
-			fmt.Println("Invalid username in public key from server")
+		if message.GetSource() != pb.Message_SERVER {
+			fmt.Println("Key must be from server")
 			// Send error to the chatter
 			response = &pb.ExchangeKeyPacket{
 				Status:     pb.ExchangeKeyPacket_ERROR,
-				ToUsername: &s.Chatters[fromUsername].Username,
+				ToUsername: &(*s.Chatters)[destinationUsername].Username,
 			}
 			break
 		}
-		s.Chatters[fromUsername].SetPublicKey(&rsa.PublicKey{
+		(*s.Chatters)[destinationUsername].SetPublicKey(&rsa.PublicKey{
 			N: new(big.Int).SetBytes(exchangeKeyMessage.GetKey()),
 			E: 65537,
 		})
+		fmt.Printf("Setting public key (%s) for %s\n", utils.DebugPrintPublicKey((*s.Chatters)[destinationUsername].GetPubKey()), destinationUsername)
+
 		// Generate a random AES key and encrypt it with the Chatter's public key
 		randomAESKey := make([]byte, 32)
 		_, err := rand.Read(randomAESKey)
@@ -136,8 +144,9 @@ func (s *ChatterHandshakeService) HandleReceiveHandshake(message *pb.Message) {
 			fmt.Println("Error generating random AES key: ", err)
 			return
 		}
-		s.Chatters[fromUsername].SetAES256Key(randomAESKey)
-		encryptedAESKey, err := s.Chatters[fromUsername].EncryptWithPublicKey(randomAESKey)
+		(*s.Chatters)[destinationUsername].SetAES256Key(randomAESKey)
+		fmt.Printf("Encrypting with public key (%s) for %s\n", utils.DebugPrintPublicKey((*s.Chatters)[destinationUsername].GetPubKey()), destinationUsername)
+		encryptedAESKey, err := (*s.Chatters)[destinationUsername].EncryptWithPublicKey(randomAESKey)
 		if err != nil {
 			fmt.Println("Error encrypting AES key: ", err)
 			return
@@ -147,7 +156,7 @@ func (s *ChatterHandshakeService) HandleReceiveHandshake(message *pb.Message) {
 		response = &pb.ExchangeKeyPacket{
 			Status:           pb.ExchangeKeyPacket_REPLY_WITH_SYM_KEY,
 			EncryptedMessage: encryptedAESKey,
-			ToUsername:       &s.Chatters[fromUsername].Username,
+			ToUsername:       &(*s.Chatters)[destinationUsername].Username,
 		}
 	}
 

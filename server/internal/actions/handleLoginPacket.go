@@ -43,6 +43,7 @@ func (h *LoginMessageHandler) handleMessage(message *pb.Message) error {
 		hashedUsername := util.HashString(h.loggingInUser)
 		database := db.GetDatabase()
 		clientPublicKey, err = database.GetUserPubKey(hashedUsername)
+		fmt.Printf("Got public key (%s) for %s by request from %s\n", util.DebugPrintPublicKey(clientPublicKey), h.loggingInUser, message.GetFromUsername())
 		if err != nil {
 			loginReply = &pb.LoginPacket{
 				Status: pb.LoginPacket_LOGIN_FAILED,
@@ -63,6 +64,7 @@ func (h *LoginMessageHandler) handleMessage(message *pb.Message) error {
 		}
 
 		// Encrypt the random token with the client's public key
+		fmt.Printf("Encoding message with public key (%s) for %s by request from %s\n", util.DebugPrintPublicKey(clientPublicKey), h.loggingInUser, message.GetFromUsername())
 		encryptedToken, err = util.EncodeUsingPubK(h.randomToken, clientPublicKey)
 		if err != nil {
 			loginReply = &pb.LoginPacket{

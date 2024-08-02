@@ -2,6 +2,7 @@ package model
 
 import (
 	pb "client/resources/proto"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/tls"
@@ -68,14 +69,14 @@ func (c *Client) SendMessage(message *pb.Message) error {
 	}
 
 	// Write the length of the message
-	log.Println("SendMessage data length: ", len(data))
+	log.Println("SendMessage\t len: ", len(data))
 	err = binary.Write(c.Conn, binary.BigEndian, uint32(len(data)))
 	if err != nil {
 		return err
 	}
 
 	// Write the message itself
-	log.Println("SendMessage data: ", data)
+	//log.Println("SendMessage data: ", data)
 	_, err = c.Conn.Write(data)
 	return err
 }
@@ -91,7 +92,7 @@ func (c *Client) GetMessage() (*pb.Message, error) {
 		log.Println("Error reading message length: ", err)
 		return nil, err
 	}
-	log.Println("GetMessage length: ", length)
+	log.Println("GetMessage\t len: ", length)
 
 	// Read the message data
 	data := make([]byte, length)
@@ -100,7 +101,7 @@ func (c *Client) GetMessage() (*pb.Message, error) {
 		log.Println("Error reading message data: ", err)
 		return nil, err
 	}
-	log.Println("GetMessage data: ", data)
+	//log.Println("GetMessage data: ", data)
 
 	// Unmarshal the message
 	message := &pb.Message{}
@@ -117,7 +118,7 @@ func (c *Client) Close() error {
 }
 
 func (c *Client) DecryptMessageWithPrivateKey(message []byte) ([]byte, error) {
-	decrypted, err := rsa.DecryptOAEP(sha256.New(), nil, c.privateKey, message, nil)
+	decrypted, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, c.privateKey, message, nil)
 	if err != nil {
 		return nil, fmt.Errorf("decryption error: %v", err)
 	}

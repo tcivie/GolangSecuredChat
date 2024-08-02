@@ -24,13 +24,15 @@ func (ekp *ExchangeKeyPacket) handleMessage(message *pb.Message) error {
 		return fmt.Errorf("unable to parse exchange key message")
 	}
 	sourceUser := message.GetFromUsername()
+	destinationUser := exchangeKeyMessage.GetToUsername()
 
 	switch exchangeKeyMessage.GetStatus() {
 	case pb.ExchangeKeyPacket_REQUEST_FOR_USER_PUBLIC_KEY:
 		fmt.Println("Received request for user public key")
 		// Pull from database the client's public key (Use the username hash to get the public key)
-		hashedUsername := util.HashString(message.GetFromUsername())
+		hashedUsername := util.HashString(message.GetExchangeKeyMessage().GetToUsername())
 		clientPublicKey, err := db.GetDatabase().GetUserPubKey(hashedUsername)
+		fmt.Printf("Got public key (%s) for %s by request from %s\n", util.DebugPrintPublicKey(clientPublicKey), message.GetExchangeKeyMessage().GetToUsername(), message.GetFromUsername())
 		if err != nil {
 			exchangeKeyReply = &pb.ExchangeKeyPacket{
 				Status: pb.ExchangeKeyPacket_ERROR,
@@ -41,16 +43,18 @@ func (ekp *ExchangeKeyPacket) handleMessage(message *pb.Message) error {
 		}
 
 		exchangeKeyReply = &pb.ExchangeKeyPacket{
-			Status: pb.ExchangeKeyPacket_PUB_KEY_FROM_SERVER,
-			Key:    clientPublicKey.N.Bytes(),
+			Status:     pb.ExchangeKeyPacket_PUB_KEY_FROM_SERVER,
+			Key:        clientPublicKey.N.Bytes(),
+			ToUsername: &destinationUser,
 		}
 		destinationConn = (*ekp.listOfLoggedInUsers)[message.GetFromUsername()] // Return to sender
 		break
 	case pb.ExchangeKeyPacket_REQUEST_FOR_USER_PUBLIC_KEY_PASSIVE:
 		fmt.Println("Received request for user public key")
 		// Pull from database the client's public key (Use the username hash to get the public key)
-		hashedUsername := util.HashString(message.GetFromUsername())
+		hashedUsername := util.HashString(message.GetExchangeKeyMessage().GetToUsername())
 		clientPublicKey, err := db.GetDatabase().GetUserPubKey(hashedUsername)
+		fmt.Printf("Got public key (%s) for %s by request from %s\n", util.DebugPrintPublicKey(clientPublicKey), message.GetExchangeKeyMessage().GetToUsername(), message.GetFromUsername())
 		if err != nil {
 			exchangeKeyReply = &pb.ExchangeKeyPacket{
 				Status: pb.ExchangeKeyPacket_ERROR,
@@ -61,8 +65,9 @@ func (ekp *ExchangeKeyPacket) handleMessage(message *pb.Message) error {
 		}
 
 		exchangeKeyReply = &pb.ExchangeKeyPacket{
-			Status: pb.ExchangeKeyPacket_PUB_KEY_FROM_SERVER_PASSIVE,
-			Key:    clientPublicKey.N.Bytes(),
+			Status:     pb.ExchangeKeyPacket_PUB_KEY_FROM_SERVER_PASSIVE,
+			Key:        clientPublicKey.N.Bytes(),
+			ToUsername: &destinationUser,
 		}
 		destinationConn = (*ekp.listOfLoggedInUsers)[message.GetFromUsername()] // Return to sender
 		break
@@ -78,12 +83,18 @@ func (ekp *ExchangeKeyPacket) handleMessage(message *pb.Message) error {
 		exchangeKeyReply = exchangeKeyMessage
 		destinationConn = (*ekp.listOfLoggedInUsers)[exchangeKeyMessage.GetToUsername()]
 		break
+	case pb.ExchangeKeyPacket_ERROR:
+		fmt.Println("Received error message")
+		// Forward the message as is to the recipient
+		exchangeKeyReply = exchangeKeyMessage
+		destinationConn = (*ekp.listOfLoggedInUsers)[exchangeKeyMessage.GetToUsername()]
+		break
 	default:
 		exchangeKeyReply = &pb.ExchangeKeyPacket{
 			Status: pb.ExchangeKeyPacket_ERROR,
 		}
 		destinationConn = (*ekp.listOfLoggedInUsers)[message.GetFromUsername()]
-		fmt.Printf("invalid exchange key message status")
+		fmt.Printf("invalid exchange key message status (%d)\n", exchangeKeyMessage.GetStatus())
 	}
 
 	if destinationConn == nil {

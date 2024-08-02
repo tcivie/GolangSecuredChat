@@ -17,14 +17,14 @@ func SendMessage(conn net.Conn, message *pb.Message) error {
 	}
 
 	// Write the length of the message
-	log.Println("SendMessage data length: ", len(data))
+	log.Println("SendMessage\t len: ", len(data))
 	err = binary.Write(conn, binary.BigEndian, uint32(len(data)))
 	if err != nil {
 		return fmt.Errorf("error writing message length: %v", err)
 	}
 
 	// Write the message itself
-	log.Println("SendMessage data: ", data)
+	//log.Println("SendMessage data: ", data)
 	_, err = conn.Write(data)
 	if err != nil {
 		return fmt.Errorf("error writing message: %v", err)
@@ -38,7 +38,7 @@ func ReadMessage(conn net.Conn) (*pb.Message, error) {
 	// Read the message length
 	var length uint32
 	err := binary.Read(conn, binary.BigEndian, &length)
-	log.Println("ReadMessage length: ", length)
+	log.Println("ReadMessage\t len: ", length)
 	if err != nil {
 		return nil, fmt.Errorf("error reading message length: %v", err)
 	}
@@ -46,7 +46,7 @@ func ReadMessage(conn net.Conn) (*pb.Message, error) {
 	// Read the message data
 	data := make([]byte, length)
 	_, err = io.ReadFull(conn, data)
-	log.Println("ReadMessage data: ", data)
+	//log.Println("ReadMessage data: ", data)
 	if err != nil {
 		return nil, fmt.Errorf("error reading message data: %v", err)
 	}

@@ -13,7 +13,7 @@ type ChatViewModel struct {
 	chatterHandshakeService *service.ChatterHandshakeService
 	messages                map[string][]model.Message
 	CurrentChatter          string
-	chatters                map[string]*model.Chatter
+	chatters                *map[string]*model.Chatter
 	onBack                  *func()
 	messagesMutex           sync.RWMutex
 	//
@@ -26,8 +26,8 @@ func NewChatViewModel(commService *service.CommunicationService) *ChatViewModel 
 		chatService:             service.NewChatService(commService),
 		commService:             commService,
 		messages:                make(map[string][]model.Message),
-		chatters:                chatters,
-		chatterHandshakeService: service.NewChatterHandshakeService(commService, chatters),
+		chatters:                &chatters,
+		chatterHandshakeService: service.NewChatterHandshakeService(commService, &chatters),
 	}
 }
 
@@ -46,8 +46,8 @@ func (vm *ChatViewModel) handleHandshakeMessage(message *pb.Message) {
 	defer vm.messagesMutex.Unlock()
 
 	fromUsername := message.GetFromUsername()
-	if _, exists := vm.chatters[fromUsername]; !exists {
-		vm.chatters[fromUsername] = model.NewChatter(fromUsername)
+	if _, exists := (*vm.chatters)[fromUsername]; !exists {
+		(*vm.chatters)[fromUsername] = model.NewChatter(fromUsername)
 	}
 
 	vm.chatterHandshakeService.HandleReceiveHandshake(message)
@@ -60,9 +60,8 @@ func (vm *ChatViewModel) SetCurrentChat(username string) {
 	if _, exists := vm.messages[username]; !exists {
 		vm.messages[username] = []model.Message{}
 	}
-	if _, exists := vm.chatters[username]; !exists {
-		vm.chatters[username] = model.NewChatter(username)
-		vm.chatterHandshakeService = service.NewChatterHandshakeService(vm.commService, vm.chatters)
+	if _, exists := (*vm.chatters)[username]; !exists {
+		(*vm.chatters)[username] = model.NewChatter(username)
 		if err := vm.chatterHandshakeService.Handshake(username); err != nil {
 			vm.AddMessage(model.Message{Content: "Error handshaking with user: " + err.Error(), Sender: "System"})
 		}
@@ -73,7 +72,7 @@ func (vm *ChatViewModel) SendMessage(content string, receiver string) {
 	vm.messagesMutex.Lock()
 	defer vm.messagesMutex.Unlock()
 
-	chatter, exists := vm.chatters[receiver]
+	chatter, exists := (*vm.chatters)[receiver]
 	if !exists {
 		vm.AddMessage(model.Message{Content: "Error: Chatter not found", Sender: "System"})
 		return
@@ -112,7 +111,7 @@ func (vm *ChatViewModel) ReceiveMessages(messageChan chan<- model.Message) {
 		}
 
 		senderUsername := message.GetFromUsername()
-		chatter, exists := vm.chatters[senderUsername]
+		chatter, exists := (*vm.chatters)[senderUsername]
 		if !exists {
 			messageChan <- model.Message{Content: "Error: Unknown sender", Sender: "System"}
 			continue
