@@ -6,15 +6,13 @@ import (
 	"client/internal/view"
 	"client/internal/viewmodel"
 	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/widget"
-	"os"
 	"time"
 )
 
 func main() {
 	a := app.New()
-	client, err := model.NewClient("localhost:8080", os.Getenv("PRIVATE_KEY"))
-	if err == nil {
+	client := model.NewClient()
+	if true {
 		commService := service.NewCommunicationService(client)
 
 		loginVM := viewmodel.NewAuthViewModel(commService)
@@ -57,11 +55,5 @@ func main() {
 		loginView.Run()
 		loginView.Show()
 		a.Run()
-	} else {
-		a := app.New()
-		errWindow := a.NewWindow("Error connecting to server")
-		errorMessage := widget.NewLabel(err.Error())
-		errWindow.SetContent(errorMessage)
-		errWindow.ShowAndRun()
 	}
 }

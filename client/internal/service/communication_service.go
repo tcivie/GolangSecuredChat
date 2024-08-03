@@ -20,6 +20,8 @@ type CommunicationService struct {
 	errorChan      chan error
 	// Mutex to protect concurrent access
 	mu sync.Mutex
+	//
+	isHandlingMessages bool
 }
 
 func NewCommunicationService(client *model.Client) *CommunicationService {
@@ -34,9 +36,15 @@ func NewCommunicationService(client *model.Client) *CommunicationService {
 		errorChan:      make(chan error),
 	}
 
-	go cs.handleMessages()
-
 	return cs
+}
+
+func (cs *CommunicationService) StartHandlingMessages() {
+	if cs.isHandlingMessages {
+		return
+	}
+	cs.isHandlingMessages = true
+	go cs.handleMessages()
 }
 
 func (cs *CommunicationService) handleMessages() {
@@ -51,7 +59,7 @@ func (cs *CommunicationService) handleMessages() {
 				// You might want to implement a reconnection mechanism here
 				return
 			}
-			continue
+			return
 		}
 
 		switch msg := message.Packet.(type) {
@@ -115,8 +123,16 @@ func (cs *CommunicationService) GetClient() *model.Client {
 	return cs.client
 }
 
+func (cs *CommunicationService) IsConnected() bool {
+	return cs.client.IsConnected()
+}
+
 func (cs *CommunicationService) GetUsername() string {
 	return cs.client.Username
+}
+
+func (cs *CommunicationService) SetPrivateKeyPath(privateKeyPath string) error {
+	return cs.client.SetPrivateKey(privateKeyPath)
 }
 
 func (cs *CommunicationService) SetClientUsername(username string) {

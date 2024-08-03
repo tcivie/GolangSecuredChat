@@ -4,6 +4,7 @@
     <working_directory value="$PROJECT_DIR$" />
     <envs>
       <env name="PRIVATE_KEY" value="client/resources/private" />
+      <env name="SERVER_ADDRESS" value="localhost:8080" />
     </envs>
     <kind value="FILE" />
     <directory value="$PROJECT_DIR$" />

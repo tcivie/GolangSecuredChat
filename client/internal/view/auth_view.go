@@ -5,18 +5,24 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"image/color"
+	"path/filepath"
 )
 
 type AuthView struct {
-	viewModel  *viewmodel.AuthViewModel
-	app        fyne.App
-	window     fyne.Window
-	username   *widget.Entry
-	status     *widget.Label
-	statusChan chan string
+	viewModel        *viewmodel.AuthViewModel
+	app              fyne.App
+	window           fyne.Window
+	username         *widget.Entry
+	prvKeyPathDialog *dialog.FileDialog
+	prvKeyPath       string
+	prvKeyPathLabel  *widget.Label
+	status           *canvas.Text
+	statusChan       chan string
 }
 
 func NewLoginView(vm *viewmodel.AuthViewModel, app fyne.App) *AuthView {
@@ -58,6 +64,23 @@ func (v *AuthView) Run() {
 	v.username = widget.NewEntry()
 	v.username.SetPlaceHolder("Enter username")
 
+	v.prvKeyPathLabel = widget.NewLabel("No file selected")
+	v.prvKeyPathDialog = dialog.NewFileOpen(
+		func(reader fyne.URIReadCloser, err error) {
+			if val := reader.URI().Path(); val != "" && err == nil {
+				v.prvKeyPath = val
+				if err := v.viewModel.SetPrivateKeyPath(val); err != nil {
+					v.statusChan <- "Error setting private key: " + err.Error()
+					return
+				}
+				v.prvKeyPathLabel.SetText(filepath.Base(val))
+			}
+		}, v.window)
+
+	addFileButton := widget.NewButton("Select Private Key", func() {
+		v.prvKeyPathDialog.Show()
+	})
+
 	loginButton := widget.NewButton("Secure Login", func() {
 		go v.attemptLogin()
 	})
@@ -67,7 +90,7 @@ func (v *AuthView) Run() {
 		go v.attemptRegister()
 	})
 
-	v.status = widget.NewLabel("")
+	v.status = canvas.NewText("", color.NRGBA{R: 255, G: 0, B: 0, A: 255})
 
 	content := container.NewVBox(
 		container.NewCenter(logo),
@@ -77,6 +100,11 @@ func (v *AuthView) Run() {
 		widget.NewCard("", "", info),
 		layout.NewSpacer(),
 		v.username,
+		container.NewHBox(
+			addFileButton,
+			layout.NewSpacer(),
+			v.prvKeyPathLabel,
+		),
 		loginButton,
 		registerButton,
 		v.status,
@@ -92,17 +120,39 @@ func (v *AuthView) Run() {
 }
 
 func (v *AuthView) attemptLogin() {
+	if !v.validateInputs() {
+		return
+	}
 	username := v.username.Text
-	v.viewModel.Username = username
+	v.viewModel.SetUsername(username)
 	onLogin, err := v.viewModel.Login()
 	v.updateStatus(err, "Login", onLogin)
 }
 
 func (v *AuthView) attemptRegister() {
+	if !v.validateInputs() {
+		return
+	}
 	username := v.username.Text
 	v.viewModel.Username = username
-	onLogin, err := v.viewModel.Register()
-	v.updateStatus(err, "Registration", onLogin)
+	err := v.viewModel.Register()
+	if err != nil {
+		v.statusChan <- "Registration failed: " + err.Error()
+		return
+	}
+	v.statusChan <- "Registration successful!"
+}
+
+func (v *AuthView) validateInputs() bool {
+	if v.username.Text == "" {
+		v.statusChan <- "Username is required"
+		return false
+	}
+	if v.prvKeyPath == "" {
+		v.statusChan <- "Private key file is required"
+		return false
+	}
+	return true
 }
 
 func (v *AuthView) updateStatus(err error, action string, onLogin *func()) {
@@ -119,7 +169,8 @@ func (v *AuthView) updateStatus(err error, action string, onLogin *func()) {
 
 func (v *AuthView) listenForStatusUpdates() {
 	for status := range v.statusChan {
-		v.status.SetText(status)
+		v.status.Text = status
+		v.status.Refresh()
 	}
 }
 

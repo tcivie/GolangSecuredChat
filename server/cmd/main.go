@@ -160,17 +160,17 @@ func (s *Server) handleClient(conn net.Conn) {
 		messageContext := actions.NewMessageContext(messageHandler)
 		if err := messageContext.ExecuteStrategy(message); err != nil {
 			log.Printf("Error executing strategy: %v\n", err)
-			errorMsg := &pb.Message{
-				Source: pb.Message_SERVER,
-				Packet: &pb.Message_LoginMessage{
-					LoginMessage: &pb.LoginPacket{
-						Status: pb.LoginPacket_LOGIN_FAILED,
-					},
-				},
-			}
-			if sendErr := util.SendMessage(conn, errorMsg); sendErr != nil {
-				log.Printf("Error sending error message to client: %v\n", sendErr)
-			}
+			//errorMsg := &pb.Message{
+			//	Source: pb.Message_SERVER,
+			//	Packet: &pb.Message_LoginMessage{
+			//		LoginMessage: &pb.LoginPacket{
+			//			Status: pb.LoginPacket_LOGIN_FAILED,
+			//		},
+			//	},
+			//}
+			//if sendErr := util.SendMessage(conn, errorMsg); sendErr != nil {
+			//	log.Printf("Error sending error message to client: %v\n", sendErr)
+			//}
 		}
 	}
 }
