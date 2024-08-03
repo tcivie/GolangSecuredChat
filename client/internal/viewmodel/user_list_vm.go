@@ -52,3 +52,7 @@ func (vm *UserListViewModel) SelectedUser(user string) (onLogin *func(string), e
 	// Handle selected user
 	return vm.onSelect, nil
 }
+
+func (vm *UserListViewModel) GetCurrentUsername() string {
+	return vm.commService.GetUsername()
+}

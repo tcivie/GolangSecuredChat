@@ -26,7 +26,6 @@ type ChatViewModel struct {
 func NewChatViewModel(commService *service.CommunicationService) *ChatViewModel {
 	chatters := make(map[string]*model.Chatter)
 	messages := make(map[string][]model.Message)
-	ctx, cancel := context.WithCancel(context.Background())
 	return &ChatViewModel{
 		chatService:             service.NewChatService(commService),
 		commService:             commService,
@@ -34,8 +33,6 @@ func NewChatViewModel(commService *service.CommunicationService) *ChatViewModel 
 		chatters:                &chatters,
 		chatterHandshakeService: service.NewChatterHandshakeService(commService, &chatters),
 		messageChan:             make(chan model.Message),
-		ctx:                     ctx,
-		cancelFunc:              cancel,
 	}
 }
 
@@ -103,6 +100,9 @@ func (vm *ChatViewModel) SendMessage(content string) {
 }
 
 func (vm *ChatViewModel) StartReceivingMessages() {
+	ctx, cancel := context.WithCancel(context.Background())
+	vm.ctx = ctx
+	vm.cancelFunc = cancel
 	go vm.receiveMessages()
 }
 
@@ -127,8 +127,9 @@ func (vm *ChatViewModel) receiveMessages() {
 			return
 		default:
 			message, err := vm.chatService.ReceiveMessage(vm.ctx)
+			senderUsername := message.GetFromUsername()
 			if err != nil {
-				vm.messageChan <- model.Message{Content: "Error receiving message: " + err.Error(), Sender: "System"}
+				vm.messageChan <- model.Message{Content: "Error receiving message: " + err.Error(), Sender: "System", Receiver: vm.commService.GetUsername()}
 				continue
 			}
 			if message == nil {
@@ -141,10 +142,9 @@ func (vm *ChatViewModel) receiveMessages() {
 			}
 
 			//vm.messagesMutex.Lock()
-			senderUsername := message.GetFromUsername()
 			chatter, exists := (*vm.chatters)[senderUsername]
 			if !exists {
-				vm.messageChan <- model.Message{Content: "Error: Unknown sender", Sender: "System"}
+				vm.messageChan <- model.Message{Content: "Error: Unknown sender", Sender: "System", Receiver: vm.commService.GetUsername()}
 				//vm.messagesMutex.Unlock()
 				continue
 			}
@@ -163,7 +163,14 @@ func (vm *ChatViewModel) AddMessage(message model.Message) {
 	if message.Receiver == "" {
 		message.Receiver = vm.commService.GetUsername()
 	}
-	(*vm.messages)[vm.CurrentChatter] = append((*vm.messages)[vm.CurrentChatter], message)
+
+	if message.Sender == "You" && message.Receiver == vm.CurrentChatter {
+		(*vm.messages)[vm.CurrentChatter] = append((*vm.messages)[vm.CurrentChatter], message)
+	} else if message.Sender == vm.CurrentChatter && message.Receiver == vm.commService.GetUsername() {
+		(*vm.messages)[vm.CurrentChatter] = append((*vm.messages)[vm.CurrentChatter], message)
+	} else {
+		(*vm.messages)[message.Sender] = append((*vm.messages)[message.Sender], message)
+	}
 }
 
 func (vm *ChatViewModel) GetMessageCount() int {

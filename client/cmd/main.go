@@ -28,7 +28,7 @@ func main() {
 			userListView.Show()
 			userListVM.FetchUsers()
 			go func() {
-				ticker := time.NewTicker(1 * time.Second)
+				ticker := time.NewTicker(10 * time.Second)
 				defer ticker.Stop()
 
 				for range ticker.C {
@@ -48,8 +48,8 @@ func main() {
 		})
 
 		chatVM.SetOnBack(func() {
-			chatView.Hide()
 			userListView.Show()
+			chatView.Hide()
 		})
 
 		loginView.Run()
