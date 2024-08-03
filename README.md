@@ -100,6 +100,22 @@ You can read more about the details of this project in the [REPORT.md](REPORT.md
 - Secure key exchange for establishing encrypted communication channels
 - One-way encryption of usernames in the server database
 
+### Pictures
+Login Screen for the user
+![img.png](img.png)
+
+After login you can see the list of online users
+![img_1.png](img_1.png)
+
+And the chat window (Which you can go back from and select other chat)
+![img_2.png](img_2.png)
+
+> If someone sends you a message it would be saved in the chat with him so you can switch chats 
+> without worrying about losing the messages
+
+## Authors
+[tcivie](https://github.com/tcivie) , [omerAvi96](https://github.com/OmerAvi96)
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
