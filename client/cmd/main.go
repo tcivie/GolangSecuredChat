@@ -45,8 +45,8 @@ func main() {
 			chatView.View()
 			userListView.Hide()
 			chatVM.SetCurrentChat(selectedUser)
-			go chatView.ReceiveMessages()
 			chatView.UpdateHeader(selectedUser)
+			chatView.ReceiveMessages()
 		})
 
 		chatVM.SetOnBack(func() {

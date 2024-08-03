@@ -13,14 +13,20 @@ import (
 type ChatView struct {
 	viewModel *viewmodel.ChatViewModel
 	app       fyne.App
-	window    fyne.Window
 	messages  *widget.List
 	input     *widget.Entry
 	header    *widget.Label
+	//
+	window        fyne.Window
+	isWindowShown bool
 }
 
 func NewChatView(vm *viewmodel.ChatViewModel, app fyne.App) *ChatView {
-	return &ChatView{viewModel: vm, app: app}
+	return &ChatView{
+		viewModel:     vm,
+		app:           app,
+		isWindowShown: false,
+	}
 }
 
 func (v *ChatView) Run() {
@@ -90,8 +96,12 @@ func (v *ChatView) Run() {
 }
 
 func (v *ChatView) View() {
+	if v.isWindowShown {
+		return
+	}
 	v.Run()
 	v.window.Show()
+	v.isWindowShown = true
 }
 
 func (v *ChatView) ReceiveMessages() {
@@ -109,8 +119,11 @@ func (v *ChatView) handleIncomingMessages() {
 }
 
 func (v *ChatView) Hide() {
-	v.viewModel.StopReceivingMessages()
-	v.window.Close()
+	if v.isWindowShown {
+		v.viewModel.StopReceivingMessages()
+		v.window.Close()
+		v.isWindowShown = false
+	}
 }
 
 func (v *ChatView) submitContent(content string) {
@@ -122,9 +135,11 @@ func (v *ChatView) submitContent(content string) {
 }
 
 func (v *ChatView) refreshMessageView() {
-	v.messages.Refresh()
-	v.window.Canvas().Content().Refresh()
-	v.scrollToBottom()
+	if v.isWindowShown {
+		v.messages.Refresh()
+		v.window.Canvas().Content().Refresh()
+		v.scrollToBottom()
+	}
 }
 
 func (v *ChatView) scrollToBottom() {

@@ -19,13 +19,14 @@ func (s *ChatService) SendMessage(message *pb.Message) error {
 
 func (s *ChatService) ReceiveMessage() (*pb.Message, error) {
 	chatMsg := <-s.commService.GetChatChannel()
-	return &pb.Message{Packet: &pb.Message_ChatMessage{ChatMessage: chatMsg}}, nil
+	return chatMsg, nil
 }
 
 func (s *ChatService) GetUserList() ([]string, error) {
+	username := s.commService.GetUsername()
 	userListRequest := &pb.Message{
 		Source:       pb.Message_CLIENT,
-		FromUsername: &s.commService.GetClient().Username,
+		FromUsername: &username,
 		Packet: &pb.Message_UserListMessage{
 			UserListMessage: &pb.UserListPacket{
 				Status: pb.UserListPacket_REQUEST_USER_LIST,

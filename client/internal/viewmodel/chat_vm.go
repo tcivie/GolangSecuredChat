@@ -12,7 +12,7 @@ import (
 type ChatViewModel struct {
 	chatService             *service.ChatService
 	chatterHandshakeService *service.ChatterHandshakeService
-	messages                map[string][]model.Message
+	messages                *map[string][]model.Message
 	CurrentChatter          string
 	chatters                *map[string]*model.Chatter
 	onBack                  *func()
@@ -25,11 +25,12 @@ type ChatViewModel struct {
 
 func NewChatViewModel(commService *service.CommunicationService) *ChatViewModel {
 	chatters := make(map[string]*model.Chatter)
+	messages := make(map[string][]model.Message)
 	ctx, cancel := context.WithCancel(context.Background())
 	return &ChatViewModel{
 		chatService:             service.NewChatService(commService),
 		commService:             commService,
-		messages:                make(map[string][]model.Message),
+		messages:                &messages,
 		chatters:                &chatters,
 		chatterHandshakeService: service.NewChatterHandshakeService(commService, &chatters),
 		messageChan:             make(chan model.Message),
@@ -61,11 +62,11 @@ func (vm *ChatViewModel) handleHandshakeMessage(message *pb.Message) {
 }
 
 func (vm *ChatViewModel) SetCurrentChat(username string) {
-	vm.messagesMutex.Lock()
-	defer vm.messagesMutex.Unlock()
+	//vm.messagesMutex.Lock()
+	//defer vm.messagesMutex.Unlock()
 	vm.CurrentChatter = username
-	if _, exists := vm.messages[username]; !exists {
-		vm.messages[username] = []model.Message{}
+	if _, exists := (*vm.messages)[username]; !exists {
+		(*vm.messages)[username] = []model.Message{}
 	}
 	if _, exists := (*vm.chatters)[username]; !exists {
 		(*vm.chatters)[username] = model.NewChatter(username)
@@ -81,10 +82,10 @@ func (vm *ChatViewModel) SendMessage(content string) {
 		vm.AddMessage(model.Message{Content: "Error: Chatter not found", Sender: "System"})
 		return
 	}
-
+	fromUsername := vm.commService.GetUsername()
 	chatMessage := &pb.Message{
 		Source:       pb.Message_CLIENT,
-		FromUsername: &vm.commService.GetClient().Username,
+		FromUsername: &fromUsername,
 		Packet: &pb.Message_ChatMessage{
 			ChatMessage: &pb.ChatPacket{
 				ToUsername: chatter.Username,
@@ -116,7 +117,7 @@ func (vm *ChatViewModel) GetMessageChan() <-chan model.Message {
 }
 
 func (vm *ChatViewModel) receiveMessages() {
-	defer vm.messagesMutex.Unlock()
+	//defer vm.messagesMutex.Unlock()
 	for {
 		select {
 		case <-vm.ctx.Done():
@@ -134,45 +135,45 @@ func (vm *ChatViewModel) receiveMessages() {
 				continue
 			}
 
-			vm.messagesMutex.Lock()
+			//vm.messagesMutex.Lock()
 			senderUsername := message.GetFromUsername()
 			chatter, exists := (*vm.chatters)[senderUsername]
 			if !exists {
 				vm.messageChan <- model.Message{Content: "Error: Unknown sender", Sender: "System"}
-				vm.messagesMutex.Unlock()
+				//vm.messagesMutex.Unlock()
 				continue
 			}
 
 			decryptedContent := chatter.Decrypt(chatMessage.GetMessage())
-			receivedMessage := model.Message{Content: decryptedContent, Sender: senderUsername, Receiver: vm.commService.GetClient().Username}
+			receivedMessage := model.Message{Content: decryptedContent, Sender: senderUsername, Receiver: vm.commService.GetUsername()}
 			vm.messageChan <- receivedMessage
-			vm.messagesMutex.Unlock()
+			//vm.messagesMutex.Unlock()
 		}
 	}
 }
 
 func (vm *ChatViewModel) AddMessage(message model.Message) {
-	vm.messagesMutex.Lock()
-	defer vm.messagesMutex.Unlock()
+	//vm.messagesMutex.Lock()
+	//defer vm.messagesMutex.Unlock()
 	if message.Receiver == "" {
-		message.Receiver = vm.commService.GetClient().Username
+		message.Receiver = vm.commService.GetUsername()
 	}
-	vm.messages[message.Receiver] = append(vm.messages[message.Receiver], message)
+	(*vm.messages)[vm.CurrentChatter] = append((*vm.messages)[vm.CurrentChatter], message)
 }
 
 func (vm *ChatViewModel) GetMessageCount() int {
-	vm.messagesMutex.RLock()
-	defer vm.messagesMutex.RUnlock()
-	return len(vm.messages[vm.CurrentChatter])
+	//vm.messagesMutex.Lock()
+	//defer vm.messagesMutex.Unlock()
+	return len((*vm.messages)[vm.CurrentChatter])
 }
 
 func (vm *ChatViewModel) GetMessageContent(index int) string {
-	vm.messagesMutex.RLock()
-	defer vm.messagesMutex.RUnlock()
-	if index < 0 || index >= len(vm.messages[vm.CurrentChatter]) {
+	//vm.messagesMutex.Lock()
+	//defer vm.messagesMutex.Unlock()
+	if index < 0 || index >= len((*vm.messages)[vm.CurrentChatter]) {
 		return ""
 	}
-	msg := vm.messages[vm.CurrentChatter][index]
+	msg := (*vm.messages)[vm.CurrentChatter][index]
 	return fmt.Sprintf("%s: %s", msg.Sender, msg.Content)
 }
 

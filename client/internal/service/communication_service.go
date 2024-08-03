@@ -13,7 +13,7 @@ type CommunicationService struct {
 	// Channels for different types of messages
 	loginChan      chan *pb.LoginPacket
 	registerChan   chan *pb.RegisterPacket
-	chatChan       chan *pb.ChatPacket
+	chatChan       chan *pb.Message
 	userListChan   chan *pb.UserListPacket
 	keyChan        chan *pb.ExchangeKeyPacket
 	passiveKeyChan chan *pb.Message
@@ -27,7 +27,7 @@ func NewCommunicationService(client *model.Client) *CommunicationService {
 		client:         client,
 		loginChan:      make(chan *pb.LoginPacket),
 		registerChan:   make(chan *pb.RegisterPacket),
-		chatChan:       make(chan *pb.ChatPacket),
+		chatChan:       make(chan *pb.Message),
 		userListChan:   make(chan *pb.UserListPacket),
 		keyChan:        make(chan *pb.ExchangeKeyPacket),
 		passiveKeyChan: make(chan *pb.Message),
@@ -60,7 +60,7 @@ func (cs *CommunicationService) handleMessages() {
 		case *pb.Message_RegisterMessage:
 			cs.registerChan <- msg.RegisterMessage
 		case *pb.Message_ChatMessage:
-			cs.chatChan <- msg.ChatMessage
+			cs.chatChan <- message
 		case *pb.Message_UserListMessage:
 			cs.userListChan <- msg.UserListMessage
 		case *pb.Message_ExchangeKeyMessage:
@@ -95,7 +95,7 @@ func (cs *CommunicationService) GetRegisterChannel() <-chan *pb.RegisterPacket {
 	return cs.registerChan
 }
 
-func (cs *CommunicationService) GetChatChannel() <-chan *pb.ChatPacket {
+func (cs *CommunicationService) GetChatChannel() <-chan *pb.Message {
 	return cs.chatChan
 }
 
@@ -113,6 +113,10 @@ func (cs *CommunicationService) GetPassiveKeyExchangeChannel() <-chan *pb.Messag
 
 func (cs *CommunicationService) GetClient() *model.Client {
 	return cs.client
+}
+
+func (cs *CommunicationService) GetUsername() string {
+	return cs.client.Username
 }
 
 func (cs *CommunicationService) SetClientUsername(username string) {

@@ -53,7 +53,7 @@ func (s *ChatterHandshakeService) Handshake(username string) error {
 
 	// Encrypt our username with Chatter's public key
 	fmt.Printf("Encrypting with public key (%s) for %s\n", utils.DebugPrintPublicKey(sshPubKey), username)
-	encryptedUsername, err := (*s.Chatters)[username].EncryptWithPublicKey([]byte(s.commService.GetClient().Username))
+	encryptedUsername, err := (*s.Chatters)[username].EncryptWithPublicKey([]byte(s.commService.GetUsername()))
 	if err != nil {
 		fmt.Println("Error encrypting public key: ", err)
 		return err
@@ -78,7 +78,7 @@ func (s *ChatterHandshakeService) Handshake(username string) error {
 	}
 
 	// Decrypt the AES key with our private key
-	fmt.Printf("Decrpyting with private key for this public (%s) for %s\n", utils.DebugPrintPublicKey(s.commService.GetClient().GetPubKey()), s.commService.GetClient().Username)
+	fmt.Printf("Decrpyting with private key for this public (%s) for %s\n", utils.DebugPrintPublicKey(s.commService.GetClient().GetPubKey()), s.commService.GetUsername())
 	decryptedAESKey, err := s.commService.GetClient().DecryptMessageWithPrivateKey(messageWithSymKey.GetEncryptedMessage())
 	if err != nil {
 		fmt.Println("Error decrypting AES key: ", err)
@@ -97,7 +97,7 @@ func (s *ChatterHandshakeService) HandleReceiveHandshake(message *pb.Message) {
 	switch exchangeKeyMessage.GetStatus() {
 	case pb.ExchangeKeyPacket_REQ_FOR_SYM_KEY:
 		// Decrypt the exchangeKeyMessage with our private key
-		fmt.Printf("Decrpyting with private key for this public (%s) for %s\n", utils.DebugPrintPublicKey(s.commService.GetClient().GetPubKey()), s.commService.GetClient().Username)
+		fmt.Printf("Decrpyting with private key for this public (%s) for %s\n", utils.DebugPrintPublicKey(s.commService.GetClient().GetPubKey()), s.commService.GetUsername())
 		decryptedMessage, err := s.commService.GetClient().DecryptMessageWithPrivateKey(exchangeKeyMessage.GetEncryptedMessage())
 		if err != nil {
 			fmt.Println("Error decrypting exchangeKeyMessage: ", err)
@@ -174,9 +174,10 @@ func (s *ChatterHandshakeService) HandleReceiveHandshake(message *pb.Message) {
 }
 
 func (s *ChatterHandshakeService) sendHandshakeMessage(message *pb.ExchangeKeyPacket) error {
+	fromUsername := s.commService.GetUsername()
 	handShakeMessage := &pb.Message{
 		Source:       pb.Message_CLIENT,
-		FromUsername: &s.commService.GetClient().Username,
+		FromUsername: &fromUsername,
 		Packet: &pb.Message_ExchangeKeyMessage{
 			ExchangeKeyMessage: message,
 		},

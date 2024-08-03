@@ -31,7 +31,7 @@ func (vm *UserListViewModel) FetchUsers() {
 		return
 	}
 	// filter out the current user
-	currentUsername := vm.commService.GetClient().Username
+	currentUsername := vm.commService.GetUsername()
 	for i, user := range users {
 		if user == currentUsername {
 			users = append(users[:i], users[i+1:]...)
