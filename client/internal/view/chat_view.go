@@ -1,7 +1,6 @@
 package view
 
 import (
-	"client/internal/model"
 	"client/internal/viewmodel"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -56,13 +55,12 @@ func (v *ChatView) Run() {
 		func() fyne.CanvasObject {
 			return container.NewHBox(
 				widget.NewIcon(theme.AccountIcon()),
-				widget.NewLabel("User:"),
 				widget.NewLabel("Message placeholder"),
 			)
 		},
 		func(id widget.ListItemID, item fyne.CanvasObject) {
 			message := v.viewModel.GetMessageContent(id)
-			contentLabel := item.(*fyne.Container).Objects[2].(*widget.Label)
+			contentLabel := item.(*fyne.Container).Objects[1].(*widget.Label)
 			contentLabel.SetText(message)
 		},
 	)
@@ -71,7 +69,7 @@ func (v *ChatView) Run() {
 	v.input.SetPlaceHolder("Type a message...")
 
 	send := widget.NewButtonWithIcon("Send", theme.MailSendIcon(), func() {
-		v.submitContent(v.input.Text, v.viewModel.CurrentChatter)
+		v.submitContent(v.input.Text)
 	})
 	send.Importance = widget.HighImportance
 
@@ -84,6 +82,10 @@ func (v *ChatView) Run() {
 
 	v.window.SetContent(paddedContent)
 
+	v.window.SetOnClosed(func() {
+		v.viewModel.StopReceivingMessages()
+	})
+
 	v.window.Resize(fyne.NewSize(400, 600))
 }
 
@@ -92,25 +94,30 @@ func (v *ChatView) View() {
 	v.window.Show()
 }
 
-func (v *ChatView) Hide() {
-	v.window.Close()
+func (v *ChatView) ReceiveMessages() {
+	go v.handleIncomingMessages()
+	v.viewModel.StartReceivingMessages()
 }
 
-func (v *ChatView) submitContent(content string, receiver string) {
-	if content != "" {
-		v.viewModel.SendMessage(content, receiver)
-		v.input.SetText("")
-		v.refreshMessageView()
+func (v *ChatView) handleIncomingMessages() {
+	for message := range v.viewModel.GetMessageChan() {
+		if message.Content != "" {
+			v.viewModel.AddMessage(message)
+			v.refreshMessageView()
+		}
 	}
 }
 
-func (v *ChatView) ReceiveMessages() {
-	messageChan := make(chan model.Message)
-	go v.viewModel.ReceiveMessages(messageChan)
-	for message := range messageChan {
-		if message.Content != "" {
-			v.refreshMessageView()
-		}
+func (v *ChatView) Hide() {
+	v.viewModel.StopReceivingMessages()
+	v.window.Close()
+}
+
+func (v *ChatView) submitContent(content string) {
+	if content != "" {
+		go v.viewModel.SendMessage(content)
+		v.input.SetText("")
+		v.refreshMessageView()
 	}
 }
 

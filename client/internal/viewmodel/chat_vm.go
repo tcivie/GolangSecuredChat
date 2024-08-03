@@ -4,6 +4,7 @@ import (
 	"client/internal/model"
 	"client/internal/service"
 	pb "client/resources/proto"
+	"context"
 	"fmt"
 	"sync"
 )
@@ -16,18 +17,24 @@ type ChatViewModel struct {
 	chatters                *map[string]*model.Chatter
 	onBack                  *func()
 	messagesMutex           sync.RWMutex
-	//
-	commService *service.CommunicationService
+	commService             *service.CommunicationService
+	messageChan             chan model.Message
+	ctx                     context.Context
+	cancelFunc              context.CancelFunc
 }
 
 func NewChatViewModel(commService *service.CommunicationService) *ChatViewModel {
 	chatters := make(map[string]*model.Chatter)
+	ctx, cancel := context.WithCancel(context.Background())
 	return &ChatViewModel{
 		chatService:             service.NewChatService(commService),
 		commService:             commService,
 		messages:                make(map[string][]model.Message),
 		chatters:                &chatters,
 		chatterHandshakeService: service.NewChatterHandshakeService(commService, &chatters),
+		messageChan:             make(chan model.Message),
+		ctx:                     ctx,
+		cancelFunc:              cancel,
 	}
 }
 
@@ -68,11 +75,8 @@ func (vm *ChatViewModel) SetCurrentChat(username string) {
 	}
 }
 
-func (vm *ChatViewModel) SendMessage(content string, receiver string) {
-	vm.messagesMutex.Lock()
-	defer vm.messagesMutex.Unlock()
-
-	chatter, exists := (*vm.chatters)[receiver]
+func (vm *ChatViewModel) SendMessage(content string) {
+	chatter, exists := (*vm.chatters)[vm.CurrentChatter]
 	if !exists {
 		vm.AddMessage(model.Message{Content: "Error: Chatter not found", Sender: "System"})
 		return
@@ -97,30 +101,53 @@ func (vm *ChatViewModel) SendMessage(content string, receiver string) {
 	}
 }
 
-func (vm *ChatViewModel) ReceiveMessages(messageChan chan<- model.Message) {
+func (vm *ChatViewModel) StartReceivingMessages() {
+	go vm.receiveMessages()
+}
+
+func (vm *ChatViewModel) StopReceivingMessages() {
+	if vm.cancelFunc != nil {
+		vm.cancelFunc()
+	}
+}
+
+func (vm *ChatViewModel) GetMessageChan() <-chan model.Message {
+	return vm.messageChan
+}
+
+func (vm *ChatViewModel) receiveMessages() {
+	defer vm.messagesMutex.Unlock()
 	for {
-		message, err := vm.chatService.ReceiveMessage()
-		if err != nil {
-			messageChan <- model.Message{Content: "Error receiving message: " + err.Error(), Sender: "System"}
-			continue
-		}
+		select {
+		case <-vm.ctx.Done():
+			close(vm.messageChan)
+			return
+		default:
+			message, err := vm.chatService.ReceiveMessage()
+			if err != nil {
+				vm.messageChan <- model.Message{Content: "Error receiving message: " + err.Error(), Sender: "System"}
+				continue
+			}
 
-		chatMessage := message.GetChatMessage()
-		if chatMessage == nil {
-			continue
-		}
+			chatMessage := message.GetChatMessage()
+			if chatMessage == nil {
+				continue
+			}
 
-		senderUsername := message.GetFromUsername()
-		chatter, exists := (*vm.chatters)[senderUsername]
-		if !exists {
-			messageChan <- model.Message{Content: "Error: Unknown sender", Sender: "System"}
-			continue
-		}
+			vm.messagesMutex.Lock()
+			senderUsername := message.GetFromUsername()
+			chatter, exists := (*vm.chatters)[senderUsername]
+			if !exists {
+				vm.messageChan <- model.Message{Content: "Error: Unknown sender", Sender: "System"}
+				vm.messagesMutex.Unlock()
+				continue
+			}
 
-		decryptedContent := chatter.Decrypt(chatMessage.GetMessage())
-		receivedMessage := model.Message{Content: decryptedContent, Sender: senderUsername, Receiver: senderUsername}
-		vm.AddMessage(receivedMessage)
-		messageChan <- receivedMessage
+			decryptedContent := chatter.Decrypt(chatMessage.GetMessage())
+			receivedMessage := model.Message{Content: decryptedContent, Sender: senderUsername, Receiver: vm.commService.GetClient().Username}
+			vm.messageChan <- receivedMessage
+			vm.messagesMutex.Unlock()
+		}
 	}
 }
 
@@ -128,7 +155,7 @@ func (vm *ChatViewModel) AddMessage(message model.Message) {
 	vm.messagesMutex.Lock()
 	defer vm.messagesMutex.Unlock()
 	if message.Receiver == "" {
-		message.Receiver = vm.CurrentChatter
+		message.Receiver = vm.commService.GetClient().Username
 	}
 	vm.messages[message.Receiver] = append(vm.messages[message.Receiver], message)
 }
@@ -154,6 +181,7 @@ func (vm *ChatViewModel) SetOnBack(callback func()) {
 }
 
 func (vm *ChatViewModel) Back() {
+	vm.StopReceivingMessages()
 	if vm.onBack != nil {
 		(*vm.onBack)()
 	}

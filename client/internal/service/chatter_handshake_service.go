@@ -115,6 +115,11 @@ func (s *ChatterHandshakeService) HandleReceiveHandshake(message *pb.Message) {
 			break
 		}
 
+		// Check if the Chatter exists (if not, create it)
+		if _, exists := (*s.Chatters)[fromUsername]; !exists {
+			(*s.Chatters)[fromUsername] = model.NewChatter(fromUsername)
+		}
+
 		// Verify with the server that the public key is valid (Ask for the public key from the server)
 		response = &pb.ExchangeKeyPacket{
 			Status:     pb.ExchangeKeyPacket_REQUEST_FOR_USER_PUBLIC_KEY_PASSIVE,
