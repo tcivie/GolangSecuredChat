@@ -2,6 +2,7 @@ package service
 
 import (
 	pb "client/resources/proto"
+	"context"
 	"errors"
 )
 
@@ -17,9 +18,13 @@ func (s *ChatService) SendMessage(message *pb.Message) error {
 	return s.commService.SendMessage(message)
 }
 
-func (s *ChatService) ReceiveMessage() (*pb.Message, error) {
-	chatMsg := <-s.commService.GetChatChannel()
-	return chatMsg, nil
+func (s *ChatService) ReceiveMessage(ctx context.Context) (*pb.Message, error) {
+	select {
+	case <-ctx.Done():
+		return nil, nil
+	case chatMsg := <-s.commService.GetChatChannel():
+		return chatMsg, nil
+	}
 }
 
 func (s *ChatService) GetUserList() ([]string, error) {

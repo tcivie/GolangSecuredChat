@@ -121,13 +121,18 @@ func (vm *ChatViewModel) receiveMessages() {
 	for {
 		select {
 		case <-vm.ctx.Done():
-			close(vm.messageChan)
+			if vm.messageChan != nil {
+				close(vm.messageChan)
+			}
 			return
 		default:
-			message, err := vm.chatService.ReceiveMessage()
+			message, err := vm.chatService.ReceiveMessage(vm.ctx)
 			if err != nil {
 				vm.messageChan <- model.Message{Content: "Error receiving message: " + err.Error(), Sender: "System"}
 				continue
+			}
+			if message == nil {
+				return // context cancelled
 			}
 
 			chatMessage := message.GetChatMessage()
